@@ -1,68 +1,83 @@
-# ✏️ Roomly
+# Roomly
 
-**Draw Anything. Watch It Come Alive.**
+Roomly is a polished MVP for visualizing furniture from online stores inside a real room photo.
 
-Roomly is an AI whiteboard: sketch simple objects on an infinite canvas and
-watch them turn into a tiny living village — illustrated houses with chimney
-smoke, swaying trees, flowing rivers, and villagers who wander around, get
-coffee, and chat.
+Users can upload a room image, calibrate an approximate wall width, paste a furniture product URL,
+place a cutout on an interactive canvas, compare before/after views, vote on layout variants, and
+export a shareable visualization. The first design works without login; saving is ready for Supabase.
 
-## Quick start
+## Stack
+
+- Next.js 15 App Router
+- TypeScript
+- Tailwind CSS 4
+- shadcn/ui with Base UI primitives
+- Konva / react-konva for the room canvas
+- Supabase client plumbing for auth, projects, and saved designs
+- Server-side retailer adapter interface with clean mock fallbacks
+- Background-removal provider route with a mock fallback
+
+## Quick Start
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), hit **Start Drawing**,
-sketch a house or a tree, and press **Bring To Life**.
+Open [http://localhost:3000](http://localhost:3000).
 
-### Vision API (optional)
+## Environment Variables
 
-Copy `.env.example` to `.env.local` and set **one** of:
+Copy `.env.example` to `.env.local`.
 
-| Variable | Provider |
-|---|---|
-| `OPENAI_API_KEY` | OpenAI (`gpt-4o-mini` by default, override with `OPENAI_VISION_MODEL`) |
-| `GEMINI_API_KEY` | Google Gemini (`gemini-2.0-flash` by default, override with `GEMINI_VISION_MODEL`) |
-
-**Without a key the app still works**: it falls back to a local demo mode that
-guesses object types from the shape of each stroke, so the sketch → world
-moment is never blocked.
-
-## How it works
-
-1. **Sketch** — the left pane is a [tldraw](https://tldraw.dev) canvas with a
-   minimal toolbar (pencil, eraser, undo, clear).
-2. **Recognize** — *Bring To Life* exports the drawing as a PNG and posts it to
-   `POST /api/recognize`, which asks a vision model to return
-   `{ objects: [{ type, x, y }] }` with positions as percentages. Allowed
-   types: `house`, `tree`, `road`, `river`, `cafe`, `person`.
-3. **Live** — the right pane replaces sketches with illustrated SVG assets
-   (Framer Motion entrances, CSS keyframe idle animations) and spawns
-   villagers. Sketched `person`s become extra villagers.
-4. **Villagers** — a small finite-state machine (`lib/villagers.ts`):
-   `entering → idle → walking → sipping/inside → …`. They prefer strolling
-   along roads, visit cafes and houses, and show speech bubbles. No AI needed.
-
-## Project layout
-
-```
-app/
-  page.tsx               Landing page (hero + looping sketch→world demo)
-  draw/page.tsx          Editor: 40% canvas / 60% living world
-  api/recognize/route.ts Vision endpoint (OpenAI → Gemini → demo fallback)
-components/
-  editor/SketchCanvas.tsx  tldraw wrapper + custom toolbar
-  landing/HeroDemo.tsx     Looping hero animation
-  world/LivingWorld.tsx    World renderer, tooltips, villager loop
-  world/WorldAssets.tsx    Illustrated SVG assets (house, tree, cafe, …)
-lib/
-  world.ts               Types, coordinate mapping, sample village, demo-mode guessing
-  villagers.ts           Villager finite-state machine
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+BACKGROUND_REMOVAL_API_URL=
+BACKGROUND_REMOVAL_API_KEY=
 ```
 
-## Stack
+The MVP runs without these keys. When Supabase is not configured, designs are persisted locally in
+`localStorage`, and the save API returns a friendly login/configuration message.
 
-Next.js 15 · TypeScript · Tailwind CSS 4 · shadcn/ui · tldraw · Framer Motion ·
-OpenAI or Gemini Vision
+## Product Extraction
+
+Roomly intentionally does not depend on unrestricted Amazon scraping. Product URLs are handled
+through `lib/product-adapters.ts`, where retailer-specific adapters can be added for permitted APIs
+or metadata sources. If extraction is unavailable, the app uses editable mock metadata and supports
+manual product image, dimensions, price, and URL entry.
+
+## Background Removal
+
+`POST /api/images/remove-background` is a provider interface. Without
+`BACKGROUND_REMOVAL_API_URL`, it returns the original image or the bundled transparent demo cutout.
+Plug a provider into this route to call a real background-removal API server-side.
+
+## Design State
+
+The editor keeps exact state as JSON:
+
+- room image
+- calibration values
+- product metadata
+- placed furniture transforms
+- Konva canvas JSON
+
+This payload is what should be stored in Supabase Postgres for reopening and editing saved designs.
+
+## Routes
+
+- `/` - premium Roomly landing page with seeded public transformations
+- `/draw` - desktop-optimized editor with mobile-friendly layout
+- `/api/products/extract` - server-side product metadata adapter endpoint
+- `/api/images/remove-background` - background-removal provider endpoint
+- `/api/projects` - Supabase-ready project save endpoint with local fallback
+
+## Verification
+
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```

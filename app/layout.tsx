@@ -13,9 +13,9 @@ const caveat = Caveat({
 });
 
 export const metadata: Metadata = {
-  title: "Roomly — Draw Anything. Watch It Come Alive.",
+  title: "Roomly — Design your room in seconds.",
   description:
-    "A collaborative AI whiteboard where everything you sketch becomes a living, breathing little world.",
+    "Upload a real room photo, paste furniture links, and place approximate product cutouts into your space.",
 };
 
 export default function RootLayout({
