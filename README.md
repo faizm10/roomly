@@ -22,10 +22,14 @@ What it does:
 - Opens a floating always-on-top note window.
 - Lets the character hang from the note edge.
 - Right-click or Control-click the menu-bar icon for actions.
-- Includes Perch and Chiikawa study modes.
+- Includes Perch, Chiikawa, and SVG asset study modes.
 - Includes quiet mode and reduced motion.
 
 Quit from the menu-bar menu with `Quit Perch Notes`.
+
+The SVG asset study uses the supplied SVG set in `Assets/`; the selected body
+asset is also rendered to `public/svg-asset-character.png` for consistent
+browser and AppKit display.
 
 ## Browser prototype
 
@@ -40,4 +44,5 @@ Then open:
 ```text
 http://localhost:4173/
 http://localhost:4173/?skin=chiikawa
+http://localhost:4173/?skin=assets
 ```
