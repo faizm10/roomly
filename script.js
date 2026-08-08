@@ -104,13 +104,33 @@ document.querySelector("#motionToggle").addEventListener("change", (event) => {
 });
 
 document.querySelector("#chiikawaToggle").addEventListener("change", (event) => {
+  if (event.target.checked) {
+    document.querySelector("#assetToggle").checked = false;
+    shell.classList.remove("use-assets");
+  }
   shell.classList.toggle("use-chiikawa", event.target.checked);
   setState("arrival", 1600);
 });
 
-if (new URLSearchParams(window.location.search).get("skin") === "chiikawa") {
+document.querySelector("#assetToggle").addEventListener("change", (event) => {
+  if (event.target.checked) {
+    document.querySelector("#chiikawaToggle").checked = false;
+    shell.classList.remove("use-chiikawa");
+  }
+  shell.classList.toggle("use-assets", event.target.checked);
+  setState("arrival", 1600);
+});
+
+const requestedSkin = new URLSearchParams(window.location.search).get("skin");
+
+if (requestedSkin === "chiikawa") {
   document.querySelector("#chiikawaToggle").checked = true;
   shell.classList.add("use-chiikawa");
+}
+
+if (requestedSkin === "assets" || requestedSkin === "svg") {
+  document.querySelector("#assetToggle").checked = true;
+  shell.classList.add("use-assets");
 }
 
 editor.addEventListener("input", wakeForTyping);
