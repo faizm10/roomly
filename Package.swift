@@ -13,7 +13,8 @@ let package = Package(
         .executableTarget(
             name: "PerchNotes",
             resources: [
-                .copy("Resources/chiikawa.jpeg")
+                .copy("Resources/chiikawa.jpeg"),
+                .copy("Resources/svg-asset-character.png")
             ]
         )
     ]
