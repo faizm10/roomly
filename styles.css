@@ -637,7 +637,8 @@ legend {
   caret-color: var(--moss-dark);
 }
 
-.use-chiikawa .note-editor {
+.use-chiikawa .note-editor,
+.use-assets .note-editor {
   padding-top: 136px;
 }
 
@@ -896,12 +897,17 @@ li[data-check="true"] span:last-child {
   animation-delay: -2.4s;
 }
 
-.chiikawa-skin {
+.chiikawa-skin,
+.asset-skin {
   position: absolute;
   z-index: 6;
+  display: none;
+  filter: drop-shadow(0 10px 12px rgba(46, 39, 24, 0.16));
+}
+
+.chiikawa-skin {
   left: 9px;
   top: 35px;
-  display: none;
   width: 96px;
   height: 112px;
   object-fit: fill;
@@ -928,15 +934,38 @@ li[data-check="true"] span:last-child {
     2% 56%,
     10% 30%
   );
-  filter: drop-shadow(0 10px 12px rgba(46, 39, 24, 0.16));
 }
 
-.use-chiikawa .character {
+.asset-body {
+  left: 11px;
+  top: 40px;
+  width: 90px;
+  height: 98px;
+  object-fit: contain;
+  object-position: 50% 50%;
+  clip-path: inset(5% 3% 5% 3% round 34% 34% 22% 22%);
+}
+
+.asset-badge {
+  left: 69px;
+  top: 21px;
+  width: 28px;
+  height: 42px;
+  object-fit: cover;
+  object-position: 82% 24%;
+  clip-path: inset(3% 28% 4% 20% round 14px);
+  transform: rotate(9deg);
+}
+
+.use-chiikawa .character,
+.use-assets .character {
   height: 166px;
 }
 
 .use-chiikawa .character .body,
-.use-chiikawa .character .leg {
+.use-chiikawa .character .leg,
+.use-assets .character .body,
+.use-assets .character .leg {
   display: none;
 }
 
@@ -944,7 +973,12 @@ li[data-check="true"] span:last-child {
   display: block;
 }
 
-.use-chiikawa .character .arm {
+.use-assets .character .asset-skin {
+  display: block;
+}
+
+.use-chiikawa .character .arm,
+.use-assets .character .arm {
   top: 13px;
   width: 14px;
   height: 62px;
@@ -952,6 +986,11 @@ li[data-check="true"] span:last-child {
   border-bottom: 0;
   background: #fffdf8;
   box-shadow: inset -2px -4px 0 rgba(80, 57, 47, 0.08);
+}
+
+.use-assets .character .arm {
+  border-color: #38271c;
+  background: #b18a62;
 }
 
 .use-chiikawa .character .arm-left {
@@ -964,7 +1003,18 @@ li[data-check="true"] span:last-child {
   transform: rotate(-11deg);
 }
 
-.use-chiikawa .character .grip {
+.use-assets .character .arm-left {
+  left: 24px;
+  transform: rotate(10deg);
+}
+
+.use-assets .character .arm-right {
+  right: 21px;
+  transform: rotate(-10deg);
+}
+
+.use-chiikawa .character .grip,
+.use-assets .character .grip {
   width: 25px;
   height: 19px;
   border: 4px solid #341d1c;
@@ -975,12 +1025,25 @@ li[data-check="true"] span:last-child {
     0 3px 4px rgba(34, 29, 20, 0.14);
 }
 
+.use-assets .character .grip {
+  border-color: #38271c;
+  background: #b18a62;
+}
+
 .use-chiikawa .character .grip-left {
   left: 18px;
 }
 
 .use-chiikawa .character .grip-right {
   right: 15px;
+}
+
+.use-assets .character .grip-left {
+  left: 20px;
+}
+
+.use-assets .character .grip-right {
+  right: 17px;
 }
 
 .character[data-state="arrival"] {
