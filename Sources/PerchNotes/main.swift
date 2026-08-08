@@ -4,6 +4,7 @@ import QuartzCore
 enum CharacterSkin {
     case perch
     case chiikawa
+    case assets
 }
 
 final class FloatingNotePanel: NSPanel {
@@ -60,6 +61,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         chiikawa.state = noteController.skin == .chiikawa ? .on : .off
         menu.addItem(chiikawa)
 
+        let assets = NSMenuItem(title: "Use SVG Asset Study", action: #selector(toggleAssets), keyEquivalent: "")
+        assets.state = noteController.skin == .assets ? .on : .off
+        menu.addItem(assets)
+
         let quiet = NSMenuItem(title: "Quiet Mode", action: #selector(toggleQuiet), keyEquivalent: "")
         quiet.state = noteController.quietMode ? .on : .off
         menu.addItem(quiet)
@@ -93,6 +98,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleChiikawa() {
         noteController.skin = noteController.skin == .chiikawa ? .perch : .chiikawa
+    }
+
+    @objc private func toggleAssets() {
+        noteController.skin = noteController.skin == .assets ? .perch : .assets
     }
 
     @objc private func toggleQuiet() {
@@ -370,6 +379,24 @@ final class CharacterView: NSView {
         return NSImage(contentsOf: url)
     }()
 
+    private let assetBodyImage: NSImage? = {
+        guard let url = Bundle.module.url(forResource: "svg-asset-character", withExtension: "png") else {
+            return nil
+        }
+        return NSImage(contentsOf: url)
+    }()
+
+    private let assetBadgeImage: NSImage? = {
+        guard let url = Bundle.module.url(
+            forResource: "image 208",
+            withExtension: "svg",
+            subdirectory: "Assets"
+        ) else {
+            return nil
+        }
+        return NSImage(contentsOf: url)
+    }()
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
@@ -389,6 +416,8 @@ final class CharacterView: NSView {
             drawPerch()
         case .chiikawa:
             drawChiikawaStudy()
+        case .assets:
+            drawAssetStudy()
         }
     }
 
@@ -482,8 +511,11 @@ final class CharacterView: NSView {
             ? NSColor(calibratedWhite: 1.0, alpha: 1)
             : NSColor(calibratedRed: 0.55, green: 0.64, blue: 0.41, alpha: 1)
 
-        fill.setFill()
-        line.setStroke()
+        let resolvedLine = skin == .assets ? NSColor(calibratedRed: 0.22, green: 0.15, blue: 0.11, alpha: 1) : line
+        let resolvedFill = skin == .assets ? NSColor(calibratedRed: 0.69, green: 0.54, blue: 0.38, alpha: 1) : fill
+
+        resolvedFill.setFill()
+        resolvedLine.setStroke()
 
         drawRoundedRect(NSRect(x: 24, y: 76, width: 15, height: 62), radius: 8)
         drawRoundedRect(NSRect(x: 74, y: 76, width: 15, height: 62), radius: 8)
@@ -521,10 +553,30 @@ final class CharacterView: NSView {
         NSGraphicsContext.restoreGraphicsState()
     }
 
+    private func drawAssetStudy() {
+        if let image = assetBodyImage {
+            let path = NSBezierPath(roundedRect: NSRect(x: 20, y: 20, width: 76, height: 82), xRadius: 30, yRadius: 28)
+            NSGraphicsContext.saveGraphicsState()
+            path.addClip()
+            image.draw(in: NSRect(x: 12, y: 12, width: 94, height: 96), from: .zero, operation: .sourceOver, fraction: 1.0)
+            NSGraphicsContext.restoreGraphicsState()
+        }
+
+        if let badge = assetBadgeImage {
+            NSGraphicsContext.saveGraphicsState()
+            let transform = NSAffineTransform()
+            transform.translateX(by: 85, yBy: 102)
+            transform.rotate(byDegrees: 9)
+            transform.concat()
+            badge.draw(in: NSRect(x: -13, y: -18, width: 28, height: 42), from: .zero, operation: .sourceOver, fraction: 1.0)
+            NSGraphicsContext.restoreGraphicsState()
+        }
+    }
+
     private func drawRoundedRect(_ rect: NSRect, radius: CGFloat) {
         let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
         path.fill()
-        if skin == .chiikawa {
+        if skin == .chiikawa || skin == .assets {
             path.lineWidth = 3
             path.stroke()
         }
