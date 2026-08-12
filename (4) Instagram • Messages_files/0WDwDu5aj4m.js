@@ -1,0 +1,4 @@
+;/*FB_PKG_DELIM*/
+
+__d("IGDSClockPanoOutline24Icon.react",["IGDSSVGIconBase.react","react","react-compiler-runtime"],(function(t,n,r,o,a,i,l){"use strict";var e,s=e||(e=o("react"));function u(e){var t=o("react-compiler-runtime").c(4),n,a;t[0]===Symbol.for("react.memo_cache_sentinel")?(n=s.jsx("polyline",{fill:"none",points:"8.893 15.108 12 12 12.012 12.012 12.012 5.793",stroke:"currentColor",strokeLinecap:"round",strokeLinejoin:"round",strokeWidth:"2"}),a=s.jsx("circle",{cx:"12.001",cy:"12.005",fill:"none",r:"10.5",stroke:"currentColor",strokeLinecap:"round",strokeLinejoin:"round",strokeWidth:"2"}),t[0]=n,t[1]=a):(n=t[0],a=t[1]);var i;return t[2]!==e?(i=s.jsxs(r("IGDSSVGIconBase.react"),babelHelpers.extends({},e,{viewBox:"0 0 24 24",children:[n,a]})),t[2]=e,t[3]=i):i=t[3],i}var c=s.memo(u);l.default=c}),98);
+__d("PolarisAdsSliderDialogAdsManagerQuery_instagramRelayOperation",[],(function(t,n,r,o,a,i){a.exports="27333829509536215"}),null);
