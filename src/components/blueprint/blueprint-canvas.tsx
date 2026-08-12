@@ -31,7 +31,18 @@ type DragState =
   | { kind: "pan"; x: number; y: number }
   | { kind: "vertex"; id: ID }
   | { kind: "furniture"; id: ID; offsetX: number; offsetZ: number }
-  | { kind: "rotate-furniture"; id: ID };
+  | { kind: "rotate-furniture"; id: ID }
+  | {
+      kind: "resize-furniture";
+      id: ID;
+      handle: ResizeHandle;
+      startWidth: number;
+      startDepth: number;
+      startX: number;
+      startZ: number;
+    };
+
+type ResizeHandle = "nw" | "ne" | "se" | "sw";
 
 export function BlueprintCanvas() {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -195,6 +206,40 @@ export function BlueprintCanvas() {
     });
   }
 
+  function updateResizedFurniture(
+    event: React.PointerEvent<SVGSVGElement>,
+    furnitureDrag: Extract<DragState, { kind: "resize-furniture" }>
+  ) {
+    const item = room.furniture.find(
+      (furniture) => furniture.id === furnitureDrag.id
+    );
+
+    if (!item) {
+      return;
+    }
+
+    const localPoint = getLocalPoint(event);
+    const worldPoint = snapPointToGrid(canvasToWorld(localPoint, viewport), 0.1);
+    const radians = (item.rotation * Math.PI) / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    const dx = worldPoint.x - furnitureDrag.startX;
+    const dz = worldPoint.z - furnitureDrag.startZ;
+    const localDx = dx * cos + dz * sin;
+    const localDz = -dx * sin + dz * cos;
+    const widthSign = furnitureDrag.handle.includes("e") ? 1 : -1;
+    const depthSign = furnitureDrag.handle.includes("s") ? 1 : -1;
+    const rawWidth = furnitureDrag.startWidth + localDx * widthSign;
+    const rawDepth = furnitureDrag.startDepth + localDz * depthSign;
+    const width = Math.max(0.1, Number(rawWidth.toFixed(2)));
+    const depth = Math.max(0.1, Number(rawDepth.toFixed(2)));
+
+    updateFurniture(furnitureDrag.id, {
+      width,
+      depth
+    });
+  }
+
   const grid = useMemo(
     () => buildGrid(canvasSize.width, canvasSize.height, viewport),
     [canvasSize.height, canvasSize.width, viewport]
@@ -236,6 +281,10 @@ export function BlueprintCanvas() {
 
           if (drag.kind === "rotate-furniture") {
             updateRotatedFurniture(event, drag.id);
+          }
+
+          if (drag.kind === "resize-furniture") {
+            updateResizedFurniture(event, drag);
           }
         }}
         onPointerUp={() => setDrag({ kind: "none" })}
@@ -328,6 +377,22 @@ export function BlueprintCanvas() {
               setDrag({ kind: "rotate-furniture", id: item.id });
               updateRotatedFurniture(event, item.id);
             }}
+            onResizePointerDown={(event, handle) => {
+              event.stopPropagation();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              const worldPoint = canvasToWorld(getLocalPoint(event), viewport);
+
+              setSelection({ kind: "furniture", id: item.id });
+              setDrag({
+                kind: "resize-furniture",
+                id: item.id,
+                handle,
+                startWidth: item.width,
+                startDepth: item.depth,
+                startX: worldPoint.x,
+                startZ: worldPoint.z
+              });
+            }}
           />
         ))}
 
@@ -419,13 +484,18 @@ function FurnitureShape({
   selected,
   viewport,
   onPointerDown,
-  onRotatePointerDown
+  onRotatePointerDown,
+  onResizePointerDown
 }: {
   item: FurnitureInstance;
   selected: boolean;
   viewport: BlueprintViewport;
   onPointerDown: (event: React.PointerEvent<SVGGElement>) => void;
   onRotatePointerDown: (event: React.PointerEvent<SVGGElement>) => void;
+  onResizePointerDown: (
+    event: React.PointerEvent<SVGGElement>,
+    handle: ResizeHandle
+  ) => void;
 }) {
   const definition = getFurnitureDefinition(item.definitionId);
   const center = worldToCanvas(item, viewport);
@@ -435,6 +505,7 @@ function FurnitureShape({
   const color = item.color ?? definition?.color ?? "#9ca39d";
   const label = definition?.name ?? "Furniture";
   const textFits = width > 58 && depth > 28;
+  const canResize = definition?.resizable ?? true;
 
   return (
     <g
@@ -514,8 +585,83 @@ function FurnitureShape({
               strokeWidth={1.35}
             />
           </g>
+          {canResize ? (
+            <>
+              <ResizeHandleControl
+                handle="nw"
+                x={-width / 2 - 5}
+                y={-depth / 2 - 5}
+                onPointerDown={onResizePointerDown}
+              />
+              <ResizeHandleControl
+                handle="ne"
+                x={width / 2 + 5}
+                y={-depth / 2 - 5}
+                onPointerDown={onResizePointerDown}
+              />
+              <ResizeHandleControl
+                handle="se"
+                x={width / 2 + 5}
+                y={depth / 2 + 5}
+                onPointerDown={onResizePointerDown}
+              />
+              <ResizeHandleControl
+                handle="sw"
+                x={-width / 2 - 5}
+                y={depth / 2 + 5}
+                onPointerDown={onResizePointerDown}
+              />
+            </>
+          ) : null}
         </>
       ) : null}
+    </g>
+  );
+}
+
+function ResizeHandleControl({
+  handle,
+  x,
+  y,
+  onPointerDown
+}: {
+  handle: ResizeHandle;
+  x: number;
+  y: number;
+  onPointerDown: (
+    event: React.PointerEvent<SVGGElement>,
+    handle: ResizeHandle
+  ) => void;
+}) {
+  return (
+    <g
+      className={
+        handle === "nw" || handle === "se"
+          ? "cursor-nwse-resize"
+          : "cursor-nesw-resize"
+      }
+      onPointerDown={(event) => onPointerDown(event, handle)}
+    >
+      <rect
+        x={x - 6}
+        y={y - 6}
+        width={12}
+        height={12}
+        rx={3}
+        fill="#ffffff"
+        stroke="#14322d"
+        strokeWidth={1.5}
+      />
+      <path
+        d={
+          handle === "nw" || handle === "se"
+            ? `M ${x - 3} ${y - 3} L ${x + 3} ${y + 3}`
+            : `M ${x + 3} ${y - 3} L ${x - 3} ${y + 3}`
+        }
+        stroke="#14322d"
+        strokeLinecap="round"
+        strokeWidth={1.3}
+      />
     </g>
   );
 }
