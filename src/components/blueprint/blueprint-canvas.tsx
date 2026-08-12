@@ -30,7 +30,8 @@ type DragState =
   | { kind: "none" }
   | { kind: "pan"; x: number; y: number }
   | { kind: "vertex"; id: ID }
-  | { kind: "furniture"; id: ID; offsetX: number; offsetZ: number };
+  | { kind: "furniture"; id: ID; offsetX: number; offsetZ: number }
+  | { kind: "rotate-furniture"; id: ID };
 
 export function BlueprintCanvas() {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -169,6 +170,31 @@ export function BlueprintCanvas() {
     });
   }
 
+  function updateRotatedFurniture(
+    event: React.PointerEvent<SVGSVGElement> | React.PointerEvent<SVGGElement>,
+    furnitureId: ID
+  ) {
+    const item = room.furniture.find((furniture) => furniture.id === furnitureId);
+
+    if (!item) {
+      return;
+    }
+
+    const localPoint = getLocalPoint(event);
+    const center = worldToCanvas(item, viewport);
+    const pointerAngle =
+      (Math.atan2(localPoint.y - center.y, localPoint.x - center.x) * 180) /
+      Math.PI;
+    const rawRotation = normalizeDegrees(pointerAngle + 90);
+    const rotation = event.shiftKey
+      ? Math.round(rawRotation / 5) * 5
+      : Math.round(rawRotation / 15) * 15;
+
+    updateFurniture(furnitureId, {
+      rotation: normalizeDegrees(rotation)
+    });
+  }
+
   const grid = useMemo(
     () => buildGrid(canvasSize.width, canvasSize.height, viewport),
     [canvasSize.height, canvasSize.width, viewport]
@@ -206,6 +232,10 @@ export function BlueprintCanvas() {
 
           if (drag.kind === "furniture") {
             updateDraggedFurniture(event, drag);
+          }
+
+          if (drag.kind === "rotate-furniture") {
+            updateRotatedFurniture(event, drag.id);
           }
         }}
         onPointerUp={() => setDrag({ kind: "none" })}
@@ -290,6 +320,13 @@ export function BlueprintCanvas() {
                 offsetX: worldPoint.x - item.x,
                 offsetZ: worldPoint.z - item.z
               });
+            }}
+            onRotatePointerDown={(event) => {
+              event.stopPropagation();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setSelection({ kind: "furniture", id: item.id });
+              setDrag({ kind: "rotate-furniture", id: item.id });
+              updateRotatedFurniture(event, item.id);
             }}
           />
         ))}
@@ -377,12 +414,14 @@ function FurnitureShape({
   item,
   selected,
   viewport,
-  onPointerDown
+  onPointerDown,
+  onRotatePointerDown
 }: {
   item: FurnitureInstance;
   selected: boolean;
   viewport: BlueprintViewport;
   onPointerDown: (event: React.PointerEvent<SVGGElement>) => void;
+  onRotatePointerDown: (event: React.PointerEvent<SVGGElement>) => void;
 }) {
   const definition = getFurnitureDefinition(item.definitionId);
   const center = worldToCanvas(item, viewport);
@@ -428,17 +467,50 @@ function FurnitureShape({
         </text>
       ) : null}
       {selected ? (
-        <rect
-          x={-width / 2 - 5}
-          y={-depth / 2 - 5}
-          width={width + 10}
-          height={depth + 10}
-          rx={Math.min(9, width / 6, depth / 6)}
-          fill="none"
-          stroke="#14322d"
-          strokeDasharray="4 4"
-          strokeWidth={1.4}
-        />
+        <>
+          <rect
+            x={-width / 2 - 5}
+            y={-depth / 2 - 5}
+            width={width + 10}
+            height={depth + 10}
+            rx={Math.min(9, width / 6, depth / 6)}
+            fill="none"
+            stroke="#14322d"
+            strokeDasharray="4 4"
+            strokeWidth={1.4}
+          />
+          <g
+            className="cursor-grab active:cursor-grabbing"
+            onPointerDown={onRotatePointerDown}
+          >
+            <line
+              x1={0}
+              x2={0}
+              y1={-depth / 2 - 5}
+              y2={-depth / 2 - 24}
+              stroke="#14322d"
+              strokeDasharray="3 3"
+              strokeLinecap="round"
+              strokeWidth={1.4}
+            />
+            <circle
+              cx={0}
+              cy={-depth / 2 - 32}
+              r={9}
+              fill="#ffffff"
+              stroke="#14322d"
+              strokeWidth={1.6}
+            />
+            <path
+              d={`M -3 ${-depth / 2 - 34} A 4 4 0 1 1 2 ${-depth / 2 - 29} M 2 ${-depth / 2 - 36} V ${-depth / 2 - 31} H 6`}
+              fill="none"
+              stroke="#14322d"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.35}
+            />
+          </g>
+        </>
       ) : null}
     </g>
   );
@@ -639,6 +711,10 @@ function WallMeasurement({
 
 function findVertex(vertices: RoomVertex[], id: ID) {
   return vertices.find((vertex) => vertex.id === id);
+}
+
+function normalizeDegrees(value: number) {
+  return ((value % 360) + 360) % 360;
 }
 
 function isEditableTarget(target: EventTarget | null) {
