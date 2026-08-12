@@ -98,8 +98,14 @@ export function RoomPlannerApp() {
 function EditorDock() {
   const mode = useEditorStore((state) => state.mode);
   const tool = useEditorStore((state) => state.tool);
+  const setSelection = useEditorStore((state) => state.setSelection);
   const setMode = useEditorStore((state) => state.setMode);
   const setTool = useEditorStore((state) => state.setTool);
+
+  function openFurnitureLibrary() {
+    setTool("furniture");
+    setSelection({ kind: "room" });
+  }
 
   return (
     <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2">
@@ -133,6 +139,13 @@ function EditorDock() {
         </DockIcon>
         <DockIcon active={tool === "pan"} label="Pan" onClick={() => setTool("pan")}>
           <Move />
+        </DockIcon>
+        <DockIcon
+          active={tool === "furniture"}
+          label="Furniture"
+          onClick={openFurnitureLibrary}
+        >
+          <Armchair />
         </DockIcon>
         <span aria-hidden="true" className="dock-separator" />
         <DockIcon

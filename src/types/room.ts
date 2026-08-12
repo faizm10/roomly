@@ -60,7 +60,13 @@ export interface Room {
 }
 
 export type EditorMode = "setup" | "sketch" | "blueprint" | "room-3d";
-export type EditorTool = "select" | "vertex" | "insert-vertex" | "pan" | "measure";
+export type EditorTool =
+  | "select"
+  | "vertex"
+  | "insert-vertex"
+  | "furniture"
+  | "pan"
+  | "measure";
 
 export interface BlueprintViewport {
   zoom: number;

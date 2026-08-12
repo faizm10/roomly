@@ -359,6 +359,8 @@ export function BlueprintCanvas() {
         <span className="font-semibold">
           {tool === "insert-vertex"
             ? "Add Vertex"
+            : tool === "furniture"
+              ? "Furniture"
             : tool === "pan" || isSpaceDown
               ? "Pan"
               : "Blueprint"}
@@ -367,6 +369,8 @@ export function BlueprintCanvas() {
         <span>
           {tool === "insert-vertex"
             ? "click a wall"
+            : tool === "furniture"
+              ? "pick from panel"
             : `${Math.round(viewport.zoom * 100)}%`}
         </span>
       </div>
