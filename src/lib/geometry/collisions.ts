@@ -5,7 +5,8 @@ import { pointInsidePolygon } from "./polygon";
 export function furnitureCorners(furniture: FurnitureInstance): Point[] {
   const halfWidth = furniture.width / 2;
   const halfDepth = furniture.depth / 2;
-  const angle = furniture.rotation;
+  // `rotation` is stored in degrees everywhere else in the app.
+  const angle = (furniture.rotation * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   const localCorners = [

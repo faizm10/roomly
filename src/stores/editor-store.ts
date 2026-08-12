@@ -7,6 +7,7 @@ import {
   createRectangularRoom,
   wallsFromVertices
 } from "@/lib/geometry/rooms";
+import { roundMeters } from "@/lib/units";
 import type {
   BlueprintViewport,
   EditorMode,
@@ -22,6 +23,8 @@ interface Selection {
   id?: ID;
 }
 
+const HISTORY_LIMIT = 60;
+
 interface EditorState {
   room: Room;
   mode: EditorMode;
@@ -29,6 +32,18 @@ interface EditorState {
   selection: Selection;
   viewport: BlueprintViewport;
   savedState: "idle" | "saving" | "saved";
+  past: Room[];
+  future: Room[];
+  /**
+   * Snapshot taken when an interaction starts. It is only pushed onto the undo
+   * stack once something actually changes, so a click that moves nothing does
+   * not leave an empty step behind, and a whole drag collapses into one step.
+   */
+  pendingSnapshot: Room | null;
+  beginInteraction: () => void;
+  endInteraction: () => void;
+  undo: () => void;
+  redo: () => void;
   setMode: (mode: EditorMode) => void;
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection) => void;
@@ -46,6 +61,8 @@ interface EditorState {
   panViewport: (dx: number, dy: number) => void;
   zoomViewport: (nextZoom: number, anchor?: { x: number; y: number }) => void;
   addFurniture: (definitionId: string) => void;
+  addFurnitureAt: (definitionId: string, point: { x: number; z: number }) => void;
+  duplicateFurniture: (id: ID) => void;
   updateFurniture: (
     id: ID,
     updates: Partial<Omit<FurnitureInstance, "id" | "definitionId">>
@@ -74,6 +91,34 @@ function roomCenter(room: Room) {
   };
 }
 
+type HistoryPatch = Pick<
+  EditorState,
+  "room" | "past" | "future" | "pendingSnapshot"
+>;
+
+/** Every room mutation goes through here so undo stays consistent. */
+function commitRoom(state: EditorState, nextRoom: Room): HistoryPatch {
+  const past = state.pendingSnapshot
+    ? [...state.past, state.pendingSnapshot].slice(-HISTORY_LIMIT)
+    : state.past;
+
+  return {
+    room: touch(nextRoom),
+    past,
+    future: [],
+    pendingSnapshot: null
+  };
+}
+
+/** A fresh room starts a fresh timeline. */
+function resetHistory(room: Room): HistoryPatch {
+  return { room, past: [], future: [], pendingSnapshot: null };
+}
+
+function createFurnitureId() {
+  return `furniture-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   room: initialRoom,
   mode: "blueprint",
@@ -85,6 +130,47 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     panY: 104
   },
   savedState: "idle",
+  past: [],
+  future: [],
+  pendingSnapshot: null,
+  beginInteraction: () => set((state) => ({ pendingSnapshot: state.room })),
+  endInteraction: () => set({ pendingSnapshot: null }),
+  undo: () =>
+    set((state) => {
+      const previous = state.past.at(-1);
+
+      if (!previous) {
+        return {};
+      }
+
+      return {
+        room: previous,
+        past: state.past.slice(0, -1),
+        future: [...state.future, state.room].slice(-HISTORY_LIMIT),
+        pendingSnapshot: null,
+        selection: selectionStillValid(state.selection, previous)
+          ? state.selection
+          : { kind: "room" }
+      };
+    }),
+  redo: () =>
+    set((state) => {
+      const next = state.future.at(-1);
+
+      if (!next) {
+        return {};
+      }
+
+      return {
+        room: next,
+        past: [...state.past, state.room].slice(-HISTORY_LIMIT),
+        future: state.future.slice(0, -1),
+        pendingSnapshot: null,
+        selection: selectionStillValid(state.selection, next)
+          ? state.selection
+          : { kind: "room" }
+      };
+    }),
   setMode: (mode) =>
     set({
       mode,
@@ -95,60 +181,56 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelection: (selection) => set({ selection }),
   createSimpleRoom: (width, depth, height) =>
     set({
-      room: createRectangularRoom(width, depth, height, "New room"),
+      ...resetHistory(createRectangularRoom(width, depth, height, "New room")),
       mode: "blueprint",
       selection: { kind: "room" },
       viewport: { zoom: 1, panX: 124, panY: 104 }
     }),
   createLShapedRoom: () =>
     set({
-      room: createPolygonRoom(
-        [
-          { x: 0, z: 0 },
-          { x: 5.2, z: 0 },
-          { x: 5.2, z: 2 },
-          { x: 3.2, z: 2 },
-          { x: 3.2, z: 4.2 },
-          { x: 0, z: 4.2 }
-        ],
-        2.7,
-        "L-shaped room"
+      ...resetHistory(
+        createPolygonRoom(
+          [
+            { x: 0, z: 0 },
+            { x: 5.2, z: 0 },
+            { x: 5.2, z: 2 },
+            { x: 3.2, z: 2 },
+            { x: 3.2, z: 4.2 },
+            { x: 0, z: 4.2 }
+          ],
+          2.7,
+          "L-shaped room"
+        )
       ),
       mode: "blueprint",
       selection: { kind: "room" },
       viewport: { zoom: 0.92, panX: 124, panY: 96 }
     }),
   updateRoomName: (name) =>
-    set(({ room }) => ({
-      room: touch({ ...room, name })
-    })),
+    set((state) => commitRoom(state, { ...state.room, name })),
   updateWallHeight: (height) =>
-    set(({ room }) => ({
-      room: touch({ ...room, wallHeight: height })
-    })),
+    set((state) => commitRoom(state, { ...state.room, wallHeight: height })),
   updateVertex: (id, updates) =>
-    set(({ room }) => {
-      const vertices = room.vertices.map((vertex) =>
+    set((state) => {
+      const vertices = state.room.vertices.map((vertex) =>
         vertex.id === id ? { ...vertex, ...updates } : vertex
       );
 
-      return {
-        room: touch({
-          ...room,
-          vertices,
-          walls: wallsFromVertices(vertices)
-        })
-      };
+      return commitRoom(state, {
+        ...state.room,
+        vertices,
+        walls: wallsFromVertices(vertices)
+      });
     }),
   insertVertexOnWall: (wallId, point) =>
-    set(({ room }) => {
-      const wall = room.walls.find((item) => item.id === wallId);
+    set((state) => {
+      const wall = state.room.walls.find((item) => item.id === wallId);
 
       if (!wall) {
         return {};
       }
 
-      const startIndex = room.vertices.findIndex(
+      const startIndex = state.room.vertices.findIndex(
         (vertex) => vertex.id === wall.startVertexId
       );
 
@@ -163,14 +245,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       const insertAt = startIndex + 1;
       const vertices = [
-        ...room.vertices.slice(0, insertAt),
+        ...state.room.vertices.slice(0, insertAt),
         vertex,
-        ...room.vertices.slice(insertAt)
+        ...state.room.vertices.slice(insertAt)
       ];
 
       return {
-        room: touch({
-          ...room,
+        ...commitRoom(state, {
+          ...state.room,
           vertices,
           walls: wallsFromVertices(vertices)
         }),
@@ -179,22 +261,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     }),
   removeVertex: (id) =>
-    set(({ room, selection }) => {
-      if (room.vertices.length <= 3 || !room.vertices.some((vertex) => vertex.id === id)) {
+    set((state) => {
+      if (
+        state.room.vertices.length <= 3 ||
+        !state.room.vertices.some((vertex) => vertex.id === id)
+      ) {
         return {};
       }
 
-      const vertices = room.vertices.filter((vertex) => vertex.id !== id);
-      const selectedRemoved = selection.kind === "vertex" && selection.id === id;
+      const vertices = state.room.vertices.filter((vertex) => vertex.id !== id);
+      const selectedRemoved =
+        state.selection.kind === "vertex" && state.selection.id === id;
 
       return {
-        room: touch({
-          ...room,
+        ...commitRoom(state, {
+          ...state.room,
           vertices,
           walls: wallsFromVertices(vertices),
           openings: []
         }),
-        selection: selectedRemoved ? { kind: "room" } : selection
+        selection: selectedRemoved ? { kind: "room" } : state.selection
       };
     }),
   setViewport: (viewport) => set({ viewport }),
@@ -226,18 +312,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   addFurniture: (definitionId) => {
+    const center = roomCenter(get().room);
+
+    get().addFurnitureAt(definitionId, center);
+  },
+  addFurnitureAt: (definitionId, point) => {
     const definition = getFurnitureDefinition(definitionId);
 
     if (!definition) {
       return;
     }
 
-    const center = roomCenter(get().room);
     const furniture: FurnitureInstance = {
-      id: `furniture-${Math.random().toString(36).slice(2, 9)}`,
+      id: createFurnitureId(),
       definitionId,
-      x: Number(center.x.toFixed(2)),
-      z: Number(center.z.toFixed(2)),
+      x: roundMeters(point.x),
+      z: roundMeters(point.z),
       width: definition.defaultWidth,
       depth: definition.defaultDepth,
       height: definition.defaultHeight,
@@ -245,33 +335,74 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       color: definition.color
     };
 
-    set(({ room }) => ({
-      room: touch({ ...room, furniture: [...room.furniture, furniture] }),
+    set((state) => ({
+      ...commitRoom(
+        { ...state, pendingSnapshot: state.pendingSnapshot ?? state.room },
+        { ...state.room, furniture: [...state.room.furniture, furniture] }
+      ),
       selection: { kind: "furniture", id: furniture.id }
     }));
   },
+  duplicateFurniture: (id) =>
+    set((state) => {
+      const original = state.room.furniture.find((item) => item.id === id);
+
+      if (!original) {
+        return {};
+      }
+
+      const copy: FurnitureInstance = {
+        ...original,
+        id: createFurnitureId(),
+        x: roundMeters(original.x + 0.25),
+        z: roundMeters(original.z + 0.25)
+      };
+
+      return {
+        ...commitRoom(
+          { ...state, pendingSnapshot: state.pendingSnapshot ?? state.room },
+          { ...state.room, furniture: [...state.room.furniture, copy] }
+        ),
+        selection: { kind: "furniture", id: copy.id }
+      };
+    }),
   updateFurniture: (id, updates) =>
-    set(({ room }) => ({
-      room: touch({
-        ...room,
-        furniture: room.furniture.map((item) =>
+    set((state) =>
+      commitRoom(state, {
+        ...state.room,
+        furniture: state.room.furniture.map((item) =>
           item.id === id ? { ...item, ...updates } : item
         )
       })
-    })),
+    ),
   removeFurniture: (id) =>
-    set(({ room, selection }) => ({
-      room: touch({
-        ...room,
-        furniture: room.furniture.filter((item) => item.id !== id)
-      }),
+    set((state) => ({
+      ...commitRoom(
+        { ...state, pendingSnapshot: state.pendingSnapshot ?? state.room },
+        {
+          ...state.room,
+          furniture: state.room.furniture.filter((item) => item.id !== id)
+        }
+      ),
       selection:
-        selection.kind === "furniture" && selection.id === id
+        state.selection.kind === "furniture" && state.selection.id === id
           ? { kind: "room" }
-          : selection
+          : state.selection
     })),
   markSaving: () => set({ savedState: "saving" }),
   markSaved: () => set({ savedState: "saved" })
 }));
+
+function selectionStillValid(selection: Selection, room: Room) {
+  if (selection.kind === "furniture") {
+    return room.furniture.some((item) => item.id === selection.id);
+  }
+
+  if (selection.kind === "vertex") {
+    return room.vertices.some((vertex) => vertex.id === selection.id);
+  }
+
+  return true;
+}
 
 export const defaultFurniture = furnitureCatalog;

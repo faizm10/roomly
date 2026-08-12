@@ -2,7 +2,6 @@
 
 import {
   Armchair,
-  BedDouble,
   Box,
   ChevronLeft,
   ChevronRight,
@@ -10,33 +9,27 @@ import {
   CornerDownRight,
   Grid3X3,
   Home,
-  LampFloor,
   MousePointer2,
   Move,
-  Palette,
-  Plus,
-  RotateCw,
+  Redo2,
   Ruler,
-  Sofa,
-  Table2,
-  Trash2
+  Trash2,
+  Undo2
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BlueprintCanvas } from "@/components/blueprint/blueprint-canvas";
+import { FurnitureProperties } from "@/components/inspector/furniture-properties";
+import { FurnitureLibrary } from "@/components/library/furniture-library";
 import { RoomSetupPanel } from "@/components/setup/room-setup-panel";
 import {
   ImagesBadge,
   materialPreviewImages
 } from "@/components/ui/aceternity-effects";
 import { Dock, DockIcon } from "@/components/ui/dock";
-import {
-  furnitureCatalog,
-  getFurnitureDefinition
-} from "@/features/furniture/catalog";
+import { getFurnitureDefinition } from "@/features/furniture/catalog";
 import { localRoomRepository } from "@/features/persistence/room-repository";
+import { verticesToPoints } from "@/lib/geometry/points";
 import { useEditorStore } from "@/stores/editor-store";
-import type { FurnitureCategory } from "@/types/furniture";
-import type { FurnitureInstance } from "@/types/room";
 
 export function RoomPlannerApp() {
   const room = useEditorStore((state) => state.room);
@@ -75,14 +68,20 @@ export function RoomPlannerApp() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 text-xs text-[var(--muted)]">
-          <CheckCircle2
-            className={
-              savedState === "saving" ? "text-[#9b722f]" : "text-[var(--accent)]"
-            }
-            size={14}
-          />
-          <span>{savedState === "saving" ? "Saving..." : "Saved locally"}</span>
+        <div className="flex items-center justify-end gap-3 text-xs text-[var(--muted)]">
+          <HistoryControls />
+          <span className="h-5 w-px bg-[var(--line)]" />
+          <span className="flex items-center gap-2">
+            <CheckCircle2
+              className={
+                savedState === "saving"
+                  ? "text-[#9b722f]"
+                  : "text-[var(--accent)]"
+              }
+              size={14}
+            />
+            {savedState === "saving" ? "Saving..." : "Saved locally"}
+          </span>
         </div>
       </header>
 
@@ -105,6 +104,38 @@ export function RoomPlannerApp() {
         />
       </div>
     </main>
+  );
+}
+
+function HistoryControls() {
+  const undo = useEditorStore((state) => state.undo);
+  const redo = useEditorStore((state) => state.redo);
+  const canUndo = useEditorStore((state) => state.past.length > 0);
+  const canRedo = useEditorStore((state) => state.future.length > 0);
+
+  return (
+    <span className="flex items-center gap-1">
+      <button
+        aria-label="Undo"
+        className="history-button"
+        disabled={!canUndo}
+        title="Undo (⌘Z)"
+        type="button"
+        onClick={undo}
+      >
+        <Undo2 size={14} />
+      </button>
+      <button
+        aria-label="Redo"
+        className="history-button"
+        disabled={!canRedo}
+        title="Redo (⇧⌘Z)"
+        type="button"
+        onClick={redo}
+      >
+        <Redo2 size={14} />
+      </button>
+    </span>
   );
 }
 
@@ -198,7 +229,13 @@ function InspectorPanel({
   const addFurniture = useEditorStore((state) => state.addFurniture);
   const updateFurniture = useEditorStore((state) => state.updateFurniture);
   const removeFurniture = useEditorStore((state) => state.removeFurniture);
+  const duplicateFurniture = useEditorStore((state) => state.duplicateFurniture);
+  const beginInteraction = useEditorStore((state) => state.beginInteraction);
   const previewImages = materialPreviewImages();
+  const roomPolygon = useMemo(
+    () => verticesToPoints(room.vertices),
+    [room.vertices]
+  );
   const canRemoveVertex = room.vertices.length > 3;
   const selectedVertex =
     selection.kind === "vertex"
@@ -309,12 +346,14 @@ function InspectorPanel({
             ) : null}
           </section>
         ) : selectedFurniture ? (
-          <FurnitureInspector
+          <FurnitureProperties
+            definition={selectedFurnitureDefinition ?? undefined}
             item={selectedFurniture}
-            name={selectedFurnitureDefinition?.name ?? "Furniture"}
-            resizable={selectedFurnitureDefinition?.resizable ?? true}
+            roomPolygon={roomPolygon}
             onChange={(updates) => updateFurniture(selectedFurniture.id, updates)}
+            onDuplicate={() => duplicateFurniture(selectedFurniture.id)}
             onRemove={() => removeFurniture(selectedFurniture.id)}
+            onScrubStart={beginInteraction}
           />
         ) : tool === "furniture" ? (
           <FurnitureLibrary onAdd={addFurniture} />
@@ -332,184 +371,6 @@ function RoomInspectorEmptyState() {
       Use the dock to edit vertices, add wall points, or open furniture.
     </section>
   );
-}
-
-function FurnitureLibrary({ onAdd }: { onAdd: (definitionId: string) => void }) {
-  return (
-    <section className="space-y-3 border-t border-[var(--line)] pt-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold">Furniture</div>
-        <span className="metric-chip">Drag after add</span>
-      </div>
-      <div className="furniture-library-grid grid grid-cols-2 gap-2">
-        {furnitureCatalog.map((definition) => {
-          const Icon = iconForCategory(definition.category, definition.id);
-
-          return (
-            <button
-              key={definition.id}
-              className="furniture-card"
-              type="button"
-              onClick={() => onAdd(definition.id)}
-            >
-              <span
-                className="furniture-swatch"
-                style={{ backgroundColor: definition.color }}
-              >
-                <Icon size={15} />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-semibold text-[var(--foreground)]">
-                  {definition.name}
-                </span>
-                <span className="mt-0.5 block text-[11px] text-[var(--muted)]">
-                  {definition.defaultWidth} x {definition.defaultDepth} m
-                </span>
-              </span>
-              <Plus className="furniture-add-icon" size={13} />
-            </button>
-          );
-        })}
-      </div>
-      <p className="text-xs leading-5 text-[var(--muted)]">
-        Select furniture on the blueprint to edit exact size, placement, color,
-        and rotation.
-      </p>
-    </section>
-  );
-}
-
-function FurnitureInspector({
-  item,
-  name,
-  resizable,
-  onChange,
-  onRemove
-}: {
-  item: FurnitureInstance;
-  name: string;
-  resizable: boolean;
-  onChange: (
-    updates: Partial<Omit<FurnitureInstance, "id" | "definitionId">>
-  ) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <section className="space-y-3 border-t border-[var(--line)] pt-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{name}</div>
-          <div className="mt-0.5 text-xs text-[var(--muted)]">
-            {item.width.toFixed(2)} x {item.depth.toFixed(2)} m
-          </div>
-        </div>
-        <span className="metric-chip">{Math.round(item.rotation)} deg</span>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <NumberInput
-          label="X"
-          suffix="m"
-          value={item.x}
-          onChange={(value) => onChange({ x: value })}
-        />
-        <NumberInput
-          label="Z"
-          suffix="m"
-          value={item.z}
-          onChange={(value) => onChange({ z: value })}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <NumberInput
-          disabled={!resizable}
-          label="Width"
-          suffix="m"
-          value={item.width}
-          onChange={(value) => onChange({ width: Math.max(0.1, value) })}
-        />
-        <NumberInput
-          disabled={!resizable}
-          label="Depth"
-          suffix="m"
-          value={item.depth}
-          onChange={(value) => onChange({ depth: Math.max(0.1, value) })}
-        />
-      </div>
-
-      <NumberInput
-        label="Height"
-        suffix="m"
-        value={item.height}
-        onChange={(value) => onChange({ height: Math.max(0.01, value) })}
-      />
-
-      <label className="grid gap-1.5 text-xs font-medium text-[var(--muted)]">
-        Rotation
-        <span className="flex items-center gap-2">
-          <input
-            className="furniture-range"
-            max="359"
-            min="0"
-            step="15"
-            type="range"
-            value={item.rotation}
-            onChange={(event) => onChange({ rotation: Number(event.target.value) })}
-          />
-          <button
-            aria-label="Rotate 90 degrees"
-            className="icon-action-button"
-            type="button"
-            onClick={() => onChange({ rotation: (item.rotation + 90) % 360 })}
-          >
-            <RotateCw size={14} />
-          </button>
-        </span>
-      </label>
-
-      <label className="grid gap-1.5 text-xs font-medium text-[var(--muted)]">
-        Color
-        <span className="field-shell color-field">
-          <Palette size={14} />
-          <input
-            aria-label="Furniture color"
-            type="color"
-            value={item.color ?? "#9ca39d"}
-            onChange={(event) => onChange({ color: event.target.value })}
-          />
-          <span className="text-xs text-[var(--muted)]">
-            {(item.color ?? "#9ca39d").toUpperCase()}
-          </span>
-        </span>
-      </label>
-
-      <button className="danger-button w-full" type="button" onClick={onRemove}>
-        <Trash2 size={14} />
-        Remove furniture
-      </button>
-    </section>
-  );
-}
-
-function iconForCategory(category: FurnitureCategory, definitionId: string) {
-  if (category === "Beds") {
-    return BedDouble;
-  }
-
-  if (category === "Seating") {
-    return definitionId === "sofa" ? Sofa : Armchair;
-  }
-
-  if (category === "Lighting") {
-    return LampFloor;
-  }
-
-  if (category === "Tables" || category === "Desks") {
-    return Table2;
-  }
-
-  return Armchair;
 }
 
 function LabeledInput({

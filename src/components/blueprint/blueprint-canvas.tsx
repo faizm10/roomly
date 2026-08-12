@@ -1,13 +1,28 @@
 "use client";
 
 import { Minus, Plus, TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlignmentGuides,
+  WallDistanceIndicator
+} from "@/components/blueprint/alignment-guides";
+import {
+  FurnitureChrome,
+  FurnitureDragPreview,
+  FurnitureSymbolNode,
+  type FurnitureActivity
+} from "@/components/blueprint/furniture-node";
+import {
+  handleSigns,
+  type ResizeHandle
+} from "@/components/blueprint/selection-chrome";
 import {
   BASE_PIXELS_PER_METER,
   canvasToWorld,
   snapPointToGrid,
   worldToCanvas
 } from "@/lib/geometry/coordinates";
+import { furnitureInsideRoom } from "@/lib/geometry/collisions";
 import {
   closestPointOnSegment,
   distanceBetweenPoints,
@@ -17,8 +32,22 @@ import {
   wallMidpoint
 } from "@/lib/geometry/points";
 import { polygonArea, polygonSelfIntersects } from "@/lib/geometry/polygon";
+import {
+  snapFurniturePosition,
+  snapRotation,
+  type AlignmentGuide
+} from "@/lib/geometry/snapping";
+import { clamp, roundMeters } from "@/lib/units";
 import { getFurnitureDefinition } from "@/features/furniture/catalog";
+import {
+  FURNITURE_DRAG_MIME,
+  useFurnitureDragStore
+} from "@/features/furniture/drag-state";
 import { useEditorStore } from "@/stores/editor-store";
+import {
+  FURNITURE_LAYER_ORDER,
+  furnitureSizeBounds
+} from "@/types/furniture";
 import type {
   BlueprintViewport,
   FurnitureInstance,
@@ -38,11 +67,14 @@ type DragState =
       handle: ResizeHandle;
       startWidth: number;
       startDepth: number;
-      startX: number;
-      startZ: number;
+      startCenterX: number;
+      startCenterZ: number;
+      startPointerX: number;
+      startPointerZ: number;
     };
 
-type ResizeHandle = "nw" | "ne" | "se" | "sw";
+/** Snap feels the same at every zoom because the tolerance is set in pixels. */
+const SNAP_PIXELS = 8;
 
 export function BlueprintCanvas() {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -58,11 +90,30 @@ export function BlueprintCanvas() {
   const removeVertex = useEditorStore((state) => state.removeVertex);
   const updateFurniture = useEditorStore((state) => state.updateFurniture);
   const removeFurniture = useEditorStore((state) => state.removeFurniture);
+  const duplicateFurniture = useEditorStore((state) => state.duplicateFurniture);
+  const addFurnitureAt = useEditorStore((state) => state.addFurnitureAt);
+  const beginInteraction = useEditorStore((state) => state.beginInteraction);
+  const endInteraction = useEditorStore((state) => state.endInteraction);
+  const undo = useEditorStore((state) => state.undo);
+  const redo = useEditorStore((state) => state.redo);
+
+  const draggedDefinitionId = useFurnitureDragStore(
+    (state) => state.definitionId
+  );
+  const endLibraryDrag = useFurnitureDragStore((state) => state.endDrag);
+
   const [drag, setDrag] = useState<DragState>({ kind: "none" });
   const [isSpaceDown, setIsSpaceDown] = useState(false);
   const [hoveredWallId, setHoveredWallId] = useState<ID | null>(null);
+  const [hoveredFurnitureId, setHoveredFurnitureId] = useState<ID | null>(null);
+  const [guides, setGuides] = useState<AlignmentGuide[]>([]);
+  const [dropPoint, setDropPoint] = useState<{ x: number; z: number } | null>(
+    null
+  );
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 760 });
+
   const points = useMemo(() => verticesToPoints(room.vertices), [room.vertices]);
+  const scale = BASE_PIXELS_PER_METER * viewport.zoom;
   const canvasVertices = room.vertices.map((vertex) => ({
     ...vertex,
     canvas: worldToCanvas(vertex, viewport)
@@ -72,6 +123,46 @@ export function BlueprintCanvas() {
     .join(" ");
   const roomArea = Math.abs(polygonArea(points));
   const hasInvalidGeometry = polygonSelfIntersects(points);
+
+  const selectedFurnitureId =
+    selection.kind === "furniture" ? (selection.id ?? null) : null;
+
+  /** Paint order comes from the layer, not from creation order. */
+  const layeredFurniture = useMemo(() => {
+    return room.furniture
+      .map((item, index) => ({
+        item,
+        definition: getFurnitureDefinition(item.definitionId),
+        index
+      }))
+      .sort((a, b) => {
+        const left = FURNITURE_LAYER_ORDER[a.definition?.layer ?? "base"];
+        const right = FURNITURE_LAYER_ORDER[b.definition?.layer ?? "base"];
+
+        return left - right || a.index - b.index;
+      });
+  }, [room.furniture]);
+
+  const outOfBounds = useMemo(() => {
+    const flagged = new Set<ID>();
+
+    for (const item of room.furniture) {
+      if (!furnitureInsideRoom(item, points)) {
+        flagged.add(item.id);
+      }
+    }
+
+    return flagged;
+  }, [points, room.furniture]);
+
+  const activity: FurnitureActivity =
+    drag.kind === "furniture"
+      ? "move"
+      : drag.kind === "resize-furniture"
+        ? "resize"
+        : drag.kind === "rotate-furniture"
+          ? "rotate"
+          : "idle";
 
   useEffect(() => {
     const element = svgRef.current;
@@ -92,27 +183,92 @@ export function BlueprintCanvas() {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (
-        (event.key === "Delete" || event.key === "Backspace") &&
-        selection.kind === "vertex" &&
-        selection.id &&
-        !isEditableTarget(event.target)
-      ) {
-        event.preventDefault();
-        removeVertex(selection.id);
+  const nudgeSelected = useCallback(
+    (dx: number, dz: number) => {
+      if (!selectedFurnitureId) {
         return;
       }
 
-      if (
-        (event.key === "Delete" || event.key === "Backspace") &&
-        selection.kind === "furniture" &&
-        selection.id &&
-        !isEditableTarget(event.target)
-      ) {
+      const item = room.furniture.find(
+        (furniture) => furniture.id === selectedFurnitureId
+      );
+
+      if (!item) {
+        return;
+      }
+
+      beginInteraction();
+      updateFurniture(item.id, {
+        x: roundMeters(item.x + dx),
+        z: roundMeters(item.z + dz)
+      });
+    },
+    [beginInteraction, room.furniture, selectedFurnitureId, updateFurniture]
+  );
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      const modifier = event.metaKey || event.ctrlKey;
+
+      if (modifier && event.key.toLowerCase() === "z") {
         event.preventDefault();
-        removeFurniture(selection.id);
+
+        if (event.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+
+        return;
+      }
+
+      if (modifier && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+
+        if (selectedFurnitureId) {
+          duplicateFurniture(selectedFurnitureId);
+        }
+
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setSelection({ kind: "room" });
+        return;
+      }
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        if (selection.kind === "vertex" && selection.id) {
+          event.preventDefault();
+          removeVertex(selection.id);
+          return;
+        }
+
+        if (selectedFurnitureId) {
+          event.preventDefault();
+          removeFurniture(selectedFurnitureId);
+          return;
+        }
+      }
+
+      if (selectedFurnitureId && event.key.startsWith("Arrow")) {
+        const step = event.shiftKey ? 0.1 : 0.01;
+        event.preventDefault();
+
+        if (event.key === "ArrowLeft") {
+          nudgeSelected(-step, 0);
+        } else if (event.key === "ArrowRight") {
+          nudgeSelected(step, 0);
+        } else if (event.key === "ArrowUp") {
+          nudgeSelected(0, -step);
+        } else if (event.key === "ArrowDown") {
+          nudgeSelected(0, step);
+        }
+
         return;
       }
 
@@ -135,14 +291,22 @@ export function BlueprintCanvas() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [removeFurniture, removeVertex, selection]);
+  }, [
+    duplicateFurniture,
+    nudgeSelected,
+    redo,
+    removeFurniture,
+    removeVertex,
+    selectedFurnitureId,
+    selection,
+    setSelection,
+    undo
+  ]);
 
-  function getLocalPoint(
-    event:
-      | React.PointerEvent<SVGElement>
-      | React.WheelEvent<SVGSVGElement>
-      | React.PointerEvent<SVGGElement>
-  ) {
+  function getLocalPoint(event: {
+    clientX: number;
+    clientY: number;
+  }) {
     const bounds = svgRef.current?.getBoundingClientRect();
 
     if (!bounds) {
@@ -155,12 +319,18 @@ export function BlueprintCanvas() {
     };
   }
 
+  function findFurniture(id: ID) {
+    return room.furniture.find((item) => item.id === id);
+  }
+
   function updateDraggedVertex(
     event: React.PointerEvent<SVGSVGElement>,
     vertexId: ID
   ) {
-    const localPoint = getLocalPoint(event);
-    const worldPoint = snapPointToGrid(canvasToWorld(localPoint, viewport), 0.1);
+    const worldPoint = snapPointToGrid(
+      canvasToWorld(getLocalPoint(event), viewport),
+      0.1
+    );
 
     updateVertex(vertexId, {
       x: Number(worldPoint.x.toFixed(2)),
@@ -172,20 +342,38 @@ export function BlueprintCanvas() {
     event: React.PointerEvent<SVGSVGElement>,
     furnitureDrag: Extract<DragState, { kind: "furniture" }>
   ) {
-    const localPoint = getLocalPoint(event);
-    const worldPoint = snapPointToGrid(canvasToWorld(localPoint, viewport), 0.1);
+    const item = findFurniture(furnitureDrag.id);
 
-    updateFurniture(furnitureDrag.id, {
-      x: Number((worldPoint.x - furnitureDrag.offsetX).toFixed(2)),
-      z: Number((worldPoint.z - furnitureDrag.offsetZ).toFixed(2))
+    if (!item) {
+      return;
+    }
+
+    const worldPoint = canvasToWorld(getLocalPoint(event), viewport);
+    const candidate = {
+      x: worldPoint.x - furnitureDrag.offsetX,
+      z: worldPoint.z - furnitureDrag.offsetZ
+    };
+    // Alt gives full freedom, matching the convention in design tools.
+    const result = snapFurniturePosition(item, candidate, {
+      tolerance: SNAP_PIXELS / scale,
+      roomPolygon: points,
+      others: room.furniture.filter((other) => other.id !== item.id),
+      gridSize: 0.05,
+      enabled: !event.altKey
+    });
+
+    setGuides(result.guides);
+    updateFurniture(item.id, {
+      x: roundMeters(result.x),
+      z: roundMeters(result.z)
     });
   }
 
   function updateRotatedFurniture(
-    event: React.PointerEvent<SVGSVGElement> | React.PointerEvent<SVGGElement>,
+    event: { clientX: number; clientY: number; altKey: boolean },
     furnitureId: ID
   ) {
-    const item = room.furniture.find((furniture) => furniture.id === furnitureId);
+    const item = findFurniture(furnitureId);
 
     if (!item) {
       return;
@@ -196,62 +384,155 @@ export function BlueprintCanvas() {
     const pointerAngle =
       (Math.atan2(localPoint.y - center.y, localPoint.x - center.x) * 180) /
       Math.PI;
-    const rawRotation = normalizeDegrees(pointerAngle + 90);
-    const rotation = event.shiftKey
-      ? Math.round(rawRotation / 5) * 5
-      : Math.round(rawRotation / 15) * 15;
 
     updateFurniture(furnitureId, {
-      rotation: normalizeDegrees(rotation)
+      rotation: snapRotation(pointerAngle + 90, !event.altKey)
     });
   }
 
+  /**
+   * Anchored resize: the corner opposite the handle stays put, so the piece
+   * grows the way it does in a design tool rather than from its centre.
+   */
   function updateResizedFurniture(
     event: React.PointerEvent<SVGSVGElement>,
     furnitureDrag: Extract<DragState, { kind: "resize-furniture" }>
   ) {
-    const item = room.furniture.find(
-      (furniture) => furniture.id === furnitureDrag.id
-    );
+    const item = findFurniture(furnitureDrag.id);
 
     if (!item) {
       return;
     }
 
-    const localPoint = getLocalPoint(event);
-    const worldPoint = snapPointToGrid(canvasToWorld(localPoint, viewport), 0.1);
+    const definition = getFurnitureDefinition(item.definitionId);
+    const bounds = furnitureSizeBounds(definition);
+    const worldPoint = canvasToWorld(getLocalPoint(event), viewport);
     const radians = (item.rotation * Math.PI) / 180;
     const cos = Math.cos(radians);
     const sin = Math.sin(radians);
-    const dx = worldPoint.x - furnitureDrag.startX;
-    const dz = worldPoint.z - furnitureDrag.startZ;
+    const dx = worldPoint.x - furnitureDrag.startPointerX;
+    const dz = worldPoint.z - furnitureDrag.startPointerZ;
     const localDx = dx * cos + dz * sin;
     const localDz = -dx * sin + dz * cos;
-    const widthSign = furnitureDrag.handle.includes("e") ? 1 : -1;
-    const depthSign = furnitureDrag.handle.includes("s") ? 1 : -1;
-    const rawWidth = furnitureDrag.startWidth + localDx * widthSign;
-    const rawDepth = furnitureDrag.startDepth + localDz * depthSign;
-    const width = Math.max(0.1, Number(rawWidth.toFixed(2)));
-    const depth = Math.max(0.1, Number(rawDepth.toFixed(2)));
+    const signs = handleSigns(furnitureDrag.handle);
 
-    updateFurniture(furnitureDrag.id, {
+    const width = clamp(
+      roundToCentimetres(furnitureDrag.startWidth + localDx * signs.width),
+      bounds.minWidth,
+      bounds.maxWidth
+    );
+    const depth = clamp(
+      roundToCentimetres(furnitureDrag.startDepth + localDz * signs.depth),
+      bounds.minDepth,
+      bounds.maxDepth
+    );
+
+    // Shift the centre by half of the growth, in the piece's own frame.
+    const localShiftX = ((width - furnitureDrag.startWidth) / 2) * signs.width;
+    const localShiftZ = ((depth - furnitureDrag.startDepth) / 2) * signs.depth;
+
+    updateFurniture(item.id, {
       width,
-      depth
+      depth,
+      x: roundMeters(
+        furnitureDrag.startCenterX + localShiftX * cos - localShiftZ * sin
+      ),
+      z: roundMeters(
+        furnitureDrag.startCenterZ + localShiftX * sin + localShiftZ * cos
+      )
     });
   }
+
+  function finishDrag() {
+    setDrag({ kind: "none" });
+    setGuides([]);
+    endInteraction();
+  }
+
+  const draggedDefinition = draggedDefinitionId
+    ? getFurnitureDefinition(draggedDefinitionId)
+    : undefined;
+  const dropPreviewValid =
+    draggedDefinition && dropPoint
+      ? furnitureInsideRoom(
+          {
+            id: "preview",
+            definitionId: draggedDefinition.id,
+            x: dropPoint.x,
+            z: dropPoint.z,
+            width: draggedDefinition.defaultWidth,
+            depth: draggedDefinition.defaultDepth,
+            height: draggedDefinition.defaultHeight,
+            rotation: 0
+          },
+          points
+        )
+      : false;
 
   const grid = useMemo(
     () => buildGrid(canvasSize.width, canvasSize.height, viewport),
     [canvasSize.height, canvasSize.width, viewport]
   );
 
+  const movingItem =
+    drag.kind === "furniture" ? findFurniture(drag.id) : undefined;
+
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div
+      className="relative h-full w-full overflow-hidden"
+      onDragLeave={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          return;
+        }
+
+        setDropPoint(null);
+      }}
+      onDragOver={(event) => {
+        // Read the payload type rather than the store: `dragstart` and the
+        // first `dragover` can land in the same tick, before React re-renders.
+        if (
+          !draggedDefinitionId &&
+          !event.dataTransfer.types.includes(FURNITURE_DRAG_MIME)
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setDropPoint(
+          snapPointToGrid(canvasToWorld(getLocalPoint(event), viewport), 0.05)
+        );
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+
+        const definitionId =
+          event.dataTransfer.getData(FURNITURE_DRAG_MIME) || draggedDefinitionId;
+
+        if (definitionId) {
+          const worldPoint = snapPointToGrid(
+            canvasToWorld(getLocalPoint(event), viewport),
+            0.05
+          );
+
+          addFurnitureAt(definitionId, worldPoint);
+        }
+
+        setDropPoint(null);
+        endLibraryDrag();
+      }}
+    >
       <svg
         ref={svgRef}
-        className="h-full w-full touch-none select-none"
-        role="img"
         aria-label="Blueprint editor canvas"
+        className={`h-full w-full touch-none select-none ${
+          drag.kind === "pan"
+            ? "cursor-grabbing"
+            : tool === "pan" || isSpaceDown
+              ? "cursor-grab"
+              : "cursor-default"
+        }`}
+        role="img"
         onPointerDown={(event) => {
           if (tool === "insert-vertex") {
             return;
@@ -287,12 +568,12 @@ export function BlueprintCanvas() {
             updateResizedFurniture(event, drag);
           }
         }}
-        onPointerUp={() => setDrag({ kind: "none" })}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
         onWheel={(event) => {
           event.preventDefault();
           const localPoint = getLocalPoint(event);
-          const nextZoom =
-            viewport.zoom * (event.deltaY > 0 ? 0.92 : 1.087);
+          const nextZoom = viewport.zoom * (event.deltaY > 0 ? 0.92 : 1.087);
 
           zoomViewport(nextZoom, localPoint);
         }}
@@ -335,9 +616,9 @@ export function BlueprintCanvas() {
               insertMode={tool === "insert-vertex"}
               start={start}
               viewport={viewport}
+              onEnter={() => setHoveredWallId(wall.id)}
               onInsert={(event) => {
-                const localPoint = getLocalPoint(event);
-                const worldPoint = canvasToWorld(localPoint, viewport);
+                const worldPoint = canvasToWorld(getLocalPoint(event), viewport);
                 const snappedPoint = snapPointToGrid(
                   closestPointOnSegment(worldPoint, start, end),
                   0.1
@@ -345,23 +626,29 @@ export function BlueprintCanvas() {
 
                 insertVertexOnWall(wall.id, snappedPoint);
               }}
-              onEnter={() => setHoveredWallId(wall.id)}
               onLeave={() => setHoveredWallId(null)}
             />
           );
         })}
 
-        {room.furniture.map((item) => (
-          <FurnitureShape
+        {/* Symbols first, in layer order. */}
+        {layeredFurniture.map(({ item, definition }) => (
+          <FurnitureSymbolNode
             key={item.id}
+            center={worldToCanvas(item, viewport)}
+            definition={definition}
+            dragging={drag.kind === "furniture" && drag.id === item.id}
+            hovered={hoveredFurnitureId === item.id}
+            invalid={outOfBounds.has(item.id)}
             item={item}
-            selected={selection.kind === "furniture" && selection.id === item.id}
-            viewport={viewport}
+            scale={scale}
+            selected={selectedFurnitureId === item.id}
             onPointerDown={(event) => {
               event.stopPropagation();
               event.currentTarget.setPointerCapture(event.pointerId);
               const worldPoint = canvasToWorld(getLocalPoint(event), viewport);
 
+              beginInteraction();
               setSelection({ kind: "furniture", id: item.id });
               setDrag({
                 kind: "furniture",
@@ -370,31 +657,81 @@ export function BlueprintCanvas() {
                 offsetZ: worldPoint.z - item.z
               });
             }}
-            onRotatePointerDown={(event) => {
-              event.stopPropagation();
-              event.currentTarget.setPointerCapture(event.pointerId);
-              setSelection({ kind: "furniture", id: item.id });
-              setDrag({ kind: "rotate-furniture", id: item.id });
-              updateRotatedFurniture(event, item.id);
-            }}
-            onResizePointerDown={(event, handle) => {
-              event.stopPropagation();
-              event.currentTarget.setPointerCapture(event.pointerId);
-              const worldPoint = canvasToWorld(getLocalPoint(event), viewport);
-
-              setSelection({ kind: "furniture", id: item.id });
-              setDrag({
-                kind: "resize-furniture",
-                id: item.id,
-                handle,
-                startWidth: item.width,
-                startDepth: item.depth,
-                startX: worldPoint.x,
-                startZ: worldPoint.z
-              });
-            }}
+            onPointerEnter={() => setHoveredFurnitureId(item.id)}
+            onPointerLeave={() =>
+              setHoveredFurnitureId((current) =>
+                current === item.id ? null : current
+              )
+            }
           />
         ))}
+
+        <AlignmentGuides guides={guides} viewport={viewport} />
+
+        {movingItem ? (
+          <WallDistanceIndicator
+            item={movingItem}
+            roomPolygon={points}
+            viewport={viewport}
+          />
+        ) : null}
+
+        {/* Chrome above every symbol, so handles are never buried. */}
+        {layeredFurniture
+          .filter(({ item }) => item.id === selectedFurnitureId)
+          .map(({ item, definition }) => (
+            <FurnitureChrome
+              key={item.id}
+              activity={activity}
+              center={worldToCanvas(item, viewport)}
+              definition={definition}
+              invalid={outOfBounds.has(item.id)}
+              item={item}
+              scale={scale}
+              onDuplicate={() => duplicateFurniture(item.id)}
+              onResizePointerDown={(event, handle) => {
+                event.stopPropagation();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                const worldPoint = canvasToWorld(getLocalPoint(event), viewport);
+
+                beginInteraction();
+                setDrag({
+                  kind: "resize-furniture",
+                  id: item.id,
+                  handle,
+                  startWidth: item.width,
+                  startDepth: item.depth,
+                  startCenterX: item.x,
+                  startCenterZ: item.z,
+                  startPointerX: worldPoint.x,
+                  startPointerZ: worldPoint.z
+                });
+              }}
+              onRotatePointerDown={(event) => {
+                event.stopPropagation();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                beginInteraction();
+                setDrag({ kind: "rotate-furniture", id: item.id });
+                updateRotatedFurniture(event, item.id);
+              }}
+              onRotateQuarter={() => {
+                beginInteraction();
+                updateFurniture(item.id, {
+                  rotation: (item.rotation + 90) % 360
+                });
+              }}
+            />
+          ))}
+
+        {draggedDefinition && dropPoint ? (
+          <FurnitureDragPreview
+            center={worldToCanvas(dropPoint, viewport)}
+            definition={draggedDefinition}
+            reason="Does not fit inside the room"
+            scale={scale}
+            valid={dropPreviewValid}
+          />
+        ) : null}
 
         {canvasVertices.map((vertex) => {
           const selected =
@@ -403,6 +740,7 @@ export function BlueprintCanvas() {
           return (
             <circle
               key={vertex.id}
+              className="cursor-move"
               cx={vertex.canvas.x}
               cy={vertex.canvas.y}
               r={selected ? 6 : 5}
@@ -412,6 +750,7 @@ export function BlueprintCanvas() {
               onPointerDown={(event) => {
                 event.stopPropagation();
                 event.currentTarget.setPointerCapture(event.pointerId);
+                beginInteraction();
                 setSelection({ kind: "vertex", id: vertex.id });
                 setDrag({ kind: "vertex", id: vertex.id });
               }}
@@ -426,17 +765,17 @@ export function BlueprintCanvas() {
             ? "Add Vertex"
             : tool === "furniture"
               ? "Furniture"
-            : tool === "pan" || isSpaceDown
-              ? "Pan"
-              : "Blueprint"}
+              : tool === "pan" || isSpaceDown
+                ? "Pan"
+                : "Blueprint"}
         </span>
         <span className="text-[#a2a7a0]">·</span>
         <span>
           {tool === "insert-vertex"
             ? "click a wall"
             : tool === "furniture"
-              ? "pick from panel"
-            : `${Math.round(viewport.zoom * 100)}%`}
+              ? "drag onto the room"
+              : `${Math.round(viewport.zoom * 100)}%`}
         </span>
       </div>
 
@@ -451,7 +790,9 @@ export function BlueprintCanvas() {
         <span className="metric-chip">{roomArea.toFixed(1)} m²</span>
         <span className="metric-chip">{room.vertices.length} vertices</span>
         <span className="metric-chip">{room.furniture.length} furniture</span>
-        <span className="metric-chip">snap 10 cm</span>
+        <span className="metric-chip">
+          {drag.kind === "rotate-furniture" ? "hold ⌥ free rotate" : "snap on"}
+        </span>
       </div>
 
       <div className="absolute right-4 top-4 flex items-center gap-1 rounded-lg border border-[#d2d6cf] bg-white p-1 shadow-sm">
@@ -479,251 +820,8 @@ export function BlueprintCanvas() {
   );
 }
 
-function FurnitureShape({
-  item,
-  selected,
-  viewport,
-  onPointerDown,
-  onRotatePointerDown,
-  onResizePointerDown
-}: {
-  item: FurnitureInstance;
-  selected: boolean;
-  viewport: BlueprintViewport;
-  onPointerDown: (event: React.PointerEvent<SVGGElement>) => void;
-  onRotatePointerDown: (event: React.PointerEvent<SVGGElement>) => void;
-  onResizePointerDown: (
-    event: React.PointerEvent<SVGGElement>,
-    handle: ResizeHandle
-  ) => void;
-}) {
-  const definition = getFurnitureDefinition(item.definitionId);
-  const center = worldToCanvas(item, viewport);
-  const scale = BASE_PIXELS_PER_METER * viewport.zoom;
-  const width = Math.max(item.width * scale, 14);
-  const depth = Math.max(item.depth * scale, 14);
-  const color = item.color ?? definition?.color ?? "#9ca39d";
-  const label = definition?.name ?? "Furniture";
-  const textFits = width > 58 && depth > 28;
-  const canResize = definition?.resizable ?? true;
-
-  return (
-    <g
-      className="cursor-move"
-      transform={`translate(${center.x} ${center.y}) rotate(${item.rotation})`}
-      onPointerDown={onPointerDown}
-    >
-      <rect
-        x={-width / 2}
-        y={-depth / 2}
-        width={width}
-        height={depth}
-        rx={Math.min(7, width / 7, depth / 7)}
-        fill={color}
-        fillOpacity={item.definitionId === "rug" ? 0.5 : 0.82}
-        stroke={selected ? "#14322d" : "#59615b"}
-        strokeDasharray={item.definitionId === "rug" ? "5 4" : undefined}
-        strokeWidth={selected ? 2.2 : 1.2}
-      />
-      <FurnitureDetail item={item} width={width} depth={depth} />
-      {textFits ? (
-        <text
-          fill="#ffffff"
-          fontSize={11}
-          fontWeight={650}
-          paintOrder="stroke"
-          pointerEvents="none"
-          stroke="rgba(31, 38, 34, 0.32)"
-          strokeWidth={3}
-          textAnchor="middle"
-          y={4}
-        >
-          {label}
-        </text>
-      ) : null}
-      {selected ? (
-        <>
-          <rect
-            x={-width / 2 - 5}
-            y={-depth / 2 - 5}
-            width={width + 10}
-            height={depth + 10}
-            rx={Math.min(9, width / 6, depth / 6)}
-            fill="none"
-            stroke="#14322d"
-            strokeDasharray="4 4"
-            strokeWidth={1.4}
-          />
-          <g
-            className="cursor-grab active:cursor-grabbing"
-            onPointerDown={onRotatePointerDown}
-          >
-            <line
-              x1={0}
-              x2={0}
-              y1={-depth / 2 - 5}
-              y2={-depth / 2 - 24}
-              stroke="#14322d"
-              strokeDasharray="3 3"
-              strokeLinecap="round"
-              strokeWidth={1.4}
-            />
-            <circle
-              cx={0}
-              cy={-depth / 2 - 32}
-              r={9}
-              fill="#ffffff"
-              stroke="#14322d"
-              strokeWidth={1.6}
-            />
-            <path
-              d={`M -3 ${-depth / 2 - 34} A 4 4 0 1 1 2 ${-depth / 2 - 29} M 2 ${-depth / 2 - 36} V ${-depth / 2 - 31} H 6`}
-              fill="none"
-              stroke="#14322d"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.35}
-            />
-          </g>
-          {canResize ? (
-            <>
-              <ResizeHandleControl
-                handle="nw"
-                x={-width / 2 - 5}
-                y={-depth / 2 - 5}
-                onPointerDown={onResizePointerDown}
-              />
-              <ResizeHandleControl
-                handle="ne"
-                x={width / 2 + 5}
-                y={-depth / 2 - 5}
-                onPointerDown={onResizePointerDown}
-              />
-              <ResizeHandleControl
-                handle="se"
-                x={width / 2 + 5}
-                y={depth / 2 + 5}
-                onPointerDown={onResizePointerDown}
-              />
-              <ResizeHandleControl
-                handle="sw"
-                x={-width / 2 - 5}
-                y={depth / 2 + 5}
-                onPointerDown={onResizePointerDown}
-              />
-            </>
-          ) : null}
-        </>
-      ) : null}
-    </g>
-  );
-}
-
-function ResizeHandleControl({
-  handle,
-  x,
-  y,
-  onPointerDown
-}: {
-  handle: ResizeHandle;
-  x: number;
-  y: number;
-  onPointerDown: (
-    event: React.PointerEvent<SVGGElement>,
-    handle: ResizeHandle
-  ) => void;
-}) {
-  return (
-    <g
-      className={
-        handle === "nw" || handle === "se"
-          ? "cursor-nwse-resize"
-          : "cursor-nesw-resize"
-      }
-      onPointerDown={(event) => onPointerDown(event, handle)}
-    >
-      <rect
-        x={x - 6}
-        y={y - 6}
-        width={12}
-        height={12}
-        rx={3}
-        fill="#ffffff"
-        stroke="#14322d"
-        strokeWidth={1.5}
-      />
-      <path
-        d={
-          handle === "nw" || handle === "se"
-            ? `M ${x - 3} ${y - 3} L ${x + 3} ${y + 3}`
-            : `M ${x + 3} ${y - 3} L ${x - 3} ${y + 3}`
-        }
-        stroke="#14322d"
-        strokeLinecap="round"
-        strokeWidth={1.3}
-      />
-    </g>
-  );
-}
-
-function FurnitureDetail({
-  item,
-  width,
-  depth
-}: {
-  item: FurnitureInstance;
-  width: number;
-  depth: number;
-}) {
-  if (item.definitionId === "double-bed") {
-    return (
-      <>
-        <rect
-          x={-width * 0.38}
-          y={-depth * 0.42}
-          width={width * 0.32}
-          height={depth * 0.22}
-          rx={4}
-          fill="rgba(255,255,255,0.45)"
-        />
-        <rect
-          x={width * 0.06}
-          y={-depth * 0.42}
-          width={width * 0.32}
-          height={depth * 0.22}
-          rx={4}
-          fill="rgba(255,255,255,0.45)"
-        />
-      </>
-    );
-  }
-
-  if (item.definitionId === "office-chair" || item.definitionId === "floor-lamp") {
-    return (
-      <circle
-        r={Math.min(width, depth) * 0.28}
-        fill="rgba(255,255,255,0.32)"
-        stroke="rgba(31,38,34,0.2)"
-        strokeWidth={1}
-      />
-    );
-  }
-
-  if (item.definitionId === "desk" || item.definitionId === "tv-console") {
-    return (
-      <line
-        x1={-width * 0.38}
-        x2={width * 0.38}
-        y1={-depth * 0.2}
-        y2={-depth * 0.2}
-        stroke="rgba(255,255,255,0.42)"
-        strokeLinecap="round"
-        strokeWidth={2}
-      />
-    );
-  }
-
-  return null;
+function roundToCentimetres(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function GridLayer({
@@ -861,10 +959,6 @@ function WallMeasurement({
 
 function findVertex(vertices: RoomVertex[], id: ID) {
   return vertices.find((vertex) => vertex.id === id);
-}
-
-function normalizeDegrees(value: number) {
-  return ((value % 360) + 360) % 360;
 }
 
 function isEditableTarget(target: EventTarget | null) {
