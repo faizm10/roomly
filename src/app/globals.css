@@ -29,6 +29,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  overflow: hidden;
 }
 
 button,
@@ -190,18 +191,46 @@ svg {
   color: #505650;
 }
 
+.inspector-scroll {
+  scrollbar-gutter: stable;
+}
+
+.inspector-scroll::-webkit-scrollbar,
+.furniture-library-grid::-webkit-scrollbar {
+  width: 9px;
+}
+
+.inspector-scroll::-webkit-scrollbar-track,
+.furniture-library-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inspector-scroll::-webkit-scrollbar-thumb,
+.furniture-library-grid::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #c7ccc3;
+  background-clip: content-box;
+}
+
+.inspector-scroll::-webkit-scrollbar-thumb:hover,
+.furniture-library-grid::-webkit-scrollbar-thumb:hover {
+  background: #aeb6ac;
+  background-clip: content-box;
+}
+
 .furniture-card {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 72px;
-  grid-template-columns: 34px minmax(0, 1fr);
+  min-height: 58px;
+  grid-template-columns: 30px minmax(0, 1fr);
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   border: 1px solid #d5d8d1;
   border-radius: 8px;
   background: #ffffff;
-  padding: 9px;
+  padding: 8px;
   text-align: left;
   transition:
     border-color 120ms ease,
@@ -219,8 +248,8 @@ svg {
 
 .furniture-swatch {
   display: inline-flex;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   align-items: center;
   justify-content: center;
   border-radius: 7px;
@@ -228,6 +257,13 @@ svg {
   box-shadow:
     inset 0 0 0 1px rgba(31, 38, 34, 0.18),
     0 6px 14px rgba(36, 46, 40, 0.12);
+}
+
+.furniture-library-grid {
+  max-height: min(48dvh, 388px);
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
 }
 
 .furniture-add-icon {
@@ -545,5 +581,25 @@ svg {
   .ripple-cell:active,
   .ripple-cell:focus-visible {
     animation: none;
+  }
+}
+
+@media (max-height: 760px) {
+  .dock-shell {
+    min-height: 54px;
+    gap: 6px;
+    padding: 7px 10px;
+  }
+
+  .dock-separator {
+    height: 26px;
+  }
+
+  .furniture-library-grid {
+    max-height: min(42dvh, 300px);
+  }
+
+  .furniture-card {
+    min-height: 52px;
   }
 }

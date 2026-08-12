@@ -54,7 +54,7 @@ export function RoomPlannerApp() {
   }, [markSaved, markSaving, room]);
 
   return (
-    <main className="flex h-screen min-h-[720px] flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+    <main className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--line)] bg-[var(--panel)] px-3">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--accent-strong)] text-white">
@@ -84,7 +84,7 @@ export function RoomPlannerApp() {
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px]">
-        <section className="relative min-w-0 bg-[var(--blueprint)]">
+        <section className="relative min-h-0 min-w-0 overflow-hidden bg-[var(--blueprint)]">
           {mode === "setup" ? <RoomSetupPanel /> : <BlueprintCanvas />}
           <EditorDock />
         </section>
@@ -102,13 +102,13 @@ function EditorDock() {
   const setTool = useEditorStore((state) => state.setTool);
 
   return (
-    <div className="pointer-events-none absolute bottom-5 left-1/2 z-20 -translate-x-1/2">
+    <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2">
       <Dock
         className="pointer-events-auto"
         direction="middle"
-        iconDistance={112}
-        iconMagnification={66}
-        iconSize={46}
+        iconDistance={96}
+        iconMagnification={58}
+        iconSize={42}
       >
         <DockIcon
           active={tool === "select"}
@@ -180,12 +180,12 @@ function InspectorPanel() {
     : null;
 
   return (
-    <aside className="min-w-0 border-l border-[var(--line)] bg-[var(--panel)]">
-      <div className="border-b border-[var(--line)] px-5 py-4">
+    <aside className="flex min-h-0 min-w-0 flex-col border-l border-[var(--line)] bg-[var(--panel)]">
+      <div className="shrink-0 border-b border-[var(--line)] px-4 py-3">
         <div className="panel-label">Properties</div>
       </div>
 
-      <div className="space-y-6 p-5">
+      <div className="inspector-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold">Room</div>
@@ -269,12 +269,12 @@ function InspectorPanel() {
 
 function FurnitureLibrary({ onAdd }: { onAdd: (definitionId: string) => void }) {
   return (
-    <section className="space-y-3 border-t border-[var(--line)] pt-5">
+    <section className="space-y-3 border-t border-[var(--line)] pt-4">
       <div className="flex items-center justify-between">
         <div className="text-sm font-semibold">Furniture</div>
         <span className="metric-chip">Drag after add</span>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="furniture-library-grid grid grid-cols-2 gap-2">
         {furnitureCatalog.map((definition) => {
           const Icon = iconForCategory(definition.category, definition.id);
 
