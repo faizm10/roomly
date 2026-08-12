@@ -50,6 +50,7 @@ interface EditorState {
     id: ID,
     updates: Partial<Omit<FurnitureInstance, "id" | "definitionId">>
   ) => void;
+  removeFurniture: (id: ID) => void;
   markSaving: () => void;
   markSaved: () => void;
 }
@@ -60,6 +61,16 @@ function touch(room: Room): Room {
   return {
     ...room,
     updatedAt: new Date().toISOString()
+  };
+}
+
+function roomCenter(room: Room) {
+  const xs = room.vertices.map((vertex) => vertex.x);
+  const zs = room.vertices.map((vertex) => vertex.z);
+
+  return {
+    x: (Math.min(...xs) + Math.max(...xs)) / 2,
+    z: (Math.min(...zs) + Math.max(...zs)) / 2
   };
 }
 
@@ -221,11 +232,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return;
     }
 
+    const center = roomCenter(get().room);
     const furniture: FurnitureInstance = {
       id: `furniture-${Math.random().toString(36).slice(2, 9)}`,
       definitionId,
-      x: 1.1,
-      z: 1.1,
+      x: Number(center.x.toFixed(2)),
+      z: Number(center.z.toFixed(2)),
       width: definition.defaultWidth,
       depth: definition.defaultDepth,
       height: definition.defaultHeight,
@@ -246,6 +258,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           item.id === id ? { ...item, ...updates } : item
         )
       })
+    })),
+  removeFurniture: (id) =>
+    set(({ room, selection }) => ({
+      room: touch({
+        ...room,
+        furniture: room.furniture.filter((item) => item.id !== id)
+      }),
+      selection:
+        selection.kind === "furniture" && selection.id === id
+          ? { kind: "room" }
+          : selection
     })),
   markSaving: () => set({ savedState: "saving" }),
   markSaved: () => set({ savedState: "saved" })

@@ -108,6 +108,11 @@ svg {
   outline: 0;
 }
 
+.field-shell input:disabled {
+  cursor: not-allowed;
+  color: #90958e;
+}
+
 .primary-button,
 .secondary-button,
 .danger-button {
@@ -183,6 +188,98 @@ svg {
   padding: 0 8px;
   font-size: 12px;
   color: #505650;
+}
+
+.furniture-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 72px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #d5d8d1;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 9px;
+  text-align: left;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.furniture-card:hover {
+  border-color: #aeb8af;
+  background: #f7f8f4;
+  box-shadow: 0 8px 20px rgba(36, 46, 40, 0.08);
+  transform: translateY(-1px);
+}
+
+.furniture-swatch {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgba(31, 38, 34, 0.18),
+    0 6px 14px rgba(36, 46, 40, 0.12);
+}
+
+.furniture-add-icon {
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.furniture-card:hover .furniture-add-icon {
+  opacity: 1;
+}
+
+.furniture-range {
+  min-width: 0;
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.icon-action-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cfd2ca;
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--foreground);
+}
+
+.icon-action-button:hover {
+  border-color: #b6bbb2;
+  background: #f4f5f1;
+}
+
+.color-field {
+  gap: 8px;
+  padding: 0 10px;
+}
+
+.color-field input[type="color"] {
+  width: 30px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
 }
 
 .dock-shell {

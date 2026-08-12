@@ -42,6 +42,56 @@ export const furnitureCatalog: FurnitureDefinition[] = [
     color: "#d6d0c4"
   },
   {
+    id: "bookcase",
+    name: "Bookcase",
+    category: "Storage",
+    defaultWidth: 0.9,
+    defaultDepth: 0.34,
+    defaultHeight: 1.9,
+    resizable: true,
+    color: "#c6a06d"
+  },
+  {
+    id: "sofa",
+    name: "Sofa",
+    category: "Seating",
+    defaultWidth: 1.9,
+    defaultDepth: 0.88,
+    defaultHeight: 0.82,
+    resizable: true,
+    color: "#7f948f"
+  },
+  {
+    id: "coffee-table",
+    name: "Coffee table",
+    category: "Tables",
+    defaultWidth: 1.05,
+    defaultDepth: 0.55,
+    defaultHeight: 0.42,
+    resizable: true,
+    color: "#b18a58"
+  },
+  {
+    id: "floor-lamp",
+    name: "Floor lamp",
+    category: "Lighting",
+    defaultWidth: 0.36,
+    defaultDepth: 0.36,
+    defaultHeight: 1.6,
+    resizable: false,
+    color: "#e2c46d"
+  },
+  {
+    id: "tv-console",
+    name: "TV console",
+    category: "Electronics",
+    defaultWidth: 1.5,
+    defaultDepth: 0.38,
+    defaultHeight: 0.55,
+    resizable: true,
+    color: "#4f5a5b"
+  },
+  {
     id: "rug",
     name: "Rug",
     category: "Rugs",

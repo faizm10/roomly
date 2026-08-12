@@ -3,6 +3,7 @@
 import { Minus, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  BASE_PIXELS_PER_METER,
   canvasToWorld,
   snapPointToGrid,
   worldToCanvas
@@ -16,13 +17,20 @@ import {
   wallMidpoint
 } from "@/lib/geometry/points";
 import { polygonArea, polygonSelfIntersects } from "@/lib/geometry/polygon";
+import { getFurnitureDefinition } from "@/features/furniture/catalog";
 import { useEditorStore } from "@/stores/editor-store";
-import type { BlueprintViewport, ID, RoomVertex } from "@/types/room";
+import type {
+  BlueprintViewport,
+  FurnitureInstance,
+  ID,
+  RoomVertex
+} from "@/types/room";
 
 type DragState =
   | { kind: "none" }
   | { kind: "pan"; x: number; y: number }
-  | { kind: "vertex"; id: ID };
+  | { kind: "vertex"; id: ID }
+  | { kind: "furniture"; id: ID; offsetX: number; offsetZ: number };
 
 export function BlueprintCanvas() {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -36,6 +44,8 @@ export function BlueprintCanvas() {
   const updateVertex = useEditorStore((state) => state.updateVertex);
   const insertVertexOnWall = useEditorStore((state) => state.insertVertexOnWall);
   const removeVertex = useEditorStore((state) => state.removeVertex);
+  const updateFurniture = useEditorStore((state) => state.updateFurniture);
+  const removeFurniture = useEditorStore((state) => state.removeFurniture);
   const [drag, setDrag] = useState<DragState>({ kind: "none" });
   const [isSpaceDown, setIsSpaceDown] = useState(false);
   const [hoveredWallId, setHoveredWallId] = useState<ID | null>(null);
@@ -83,6 +93,17 @@ export function BlueprintCanvas() {
         return;
       }
 
+      if (
+        (event.key === "Delete" || event.key === "Backspace") &&
+        selection.kind === "furniture" &&
+        selection.id &&
+        !isEditableTarget(event.target)
+      ) {
+        event.preventDefault();
+        removeFurniture(selection.id);
+        return;
+      }
+
       if (event.code === "Space") {
         event.preventDefault();
         setIsSpaceDown(true);
@@ -102,7 +123,7 @@ export function BlueprintCanvas() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [removeVertex, selection]);
+  }, [removeFurniture, removeVertex, selection]);
 
   function getLocalPoint(
     event:
@@ -132,6 +153,19 @@ export function BlueprintCanvas() {
     updateVertex(vertexId, {
       x: Number(worldPoint.x.toFixed(2)),
       z: Number(worldPoint.z.toFixed(2))
+    });
+  }
+
+  function updateDraggedFurniture(
+    event: React.PointerEvent<SVGSVGElement>,
+    furnitureDrag: Extract<DragState, { kind: "furniture" }>
+  ) {
+    const localPoint = getLocalPoint(event);
+    const worldPoint = snapPointToGrid(canvasToWorld(localPoint, viewport), 0.1);
+
+    updateFurniture(furnitureDrag.id, {
+      x: Number((worldPoint.x - furnitureDrag.offsetX).toFixed(2)),
+      z: Number((worldPoint.z - furnitureDrag.offsetZ).toFixed(2))
     });
   }
 
@@ -168,6 +202,10 @@ export function BlueprintCanvas() {
 
           if (drag.kind === "vertex") {
             updateDraggedVertex(event, drag.id);
+          }
+
+          if (drag.kind === "furniture") {
+            updateDraggedFurniture(event, drag);
           }
         }}
         onPointerUp={() => setDrag({ kind: "none" })}
@@ -234,6 +272,28 @@ export function BlueprintCanvas() {
           );
         })}
 
+        {room.furniture.map((item) => (
+          <FurnitureShape
+            key={item.id}
+            item={item}
+            selected={selection.kind === "furniture" && selection.id === item.id}
+            viewport={viewport}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              const worldPoint = canvasToWorld(getLocalPoint(event), viewport);
+
+              setSelection({ kind: "furniture", id: item.id });
+              setDrag({
+                kind: "furniture",
+                id: item.id,
+                offsetX: worldPoint.x - item.x,
+                offsetZ: worldPoint.z - item.z
+              });
+            }}
+          />
+        ))}
+
         {canvasVertices.map((vertex) => {
           const selected =
             selection.kind === "vertex" && selection.id === vertex.id;
@@ -284,6 +344,7 @@ export function BlueprintCanvas() {
       <div className="absolute bottom-4 left-4 flex items-center gap-2">
         <span className="metric-chip">{roomArea.toFixed(1)} m²</span>
         <span className="metric-chip">{room.vertices.length} vertices</span>
+        <span className="metric-chip">{room.furniture.length} furniture</span>
         <span className="metric-chip">snap 10 cm</span>
       </div>
 
@@ -310,6 +371,137 @@ export function BlueprintCanvas() {
       </div>
     </div>
   );
+}
+
+function FurnitureShape({
+  item,
+  selected,
+  viewport,
+  onPointerDown
+}: {
+  item: FurnitureInstance;
+  selected: boolean;
+  viewport: BlueprintViewport;
+  onPointerDown: (event: React.PointerEvent<SVGGElement>) => void;
+}) {
+  const definition = getFurnitureDefinition(item.definitionId);
+  const center = worldToCanvas(item, viewport);
+  const scale = BASE_PIXELS_PER_METER * viewport.zoom;
+  const width = Math.max(item.width * scale, 14);
+  const depth = Math.max(item.depth * scale, 14);
+  const color = item.color ?? definition?.color ?? "#9ca39d";
+  const label = definition?.name ?? "Furniture";
+  const textFits = width > 58 && depth > 28;
+
+  return (
+    <g
+      className="cursor-move"
+      transform={`translate(${center.x} ${center.y}) rotate(${item.rotation})`}
+      onPointerDown={onPointerDown}
+    >
+      <rect
+        x={-width / 2}
+        y={-depth / 2}
+        width={width}
+        height={depth}
+        rx={Math.min(7, width / 7, depth / 7)}
+        fill={color}
+        fillOpacity={item.definitionId === "rug" ? 0.5 : 0.82}
+        stroke={selected ? "#14322d" : "#59615b"}
+        strokeDasharray={item.definitionId === "rug" ? "5 4" : undefined}
+        strokeWidth={selected ? 2.2 : 1.2}
+      />
+      <FurnitureDetail item={item} width={width} depth={depth} />
+      {textFits ? (
+        <text
+          fill="#ffffff"
+          fontSize={11}
+          fontWeight={650}
+          paintOrder="stroke"
+          pointerEvents="none"
+          stroke="rgba(31, 38, 34, 0.32)"
+          strokeWidth={3}
+          textAnchor="middle"
+          y={4}
+        >
+          {label}
+        </text>
+      ) : null}
+      {selected ? (
+        <rect
+          x={-width / 2 - 5}
+          y={-depth / 2 - 5}
+          width={width + 10}
+          height={depth + 10}
+          rx={Math.min(9, width / 6, depth / 6)}
+          fill="none"
+          stroke="#14322d"
+          strokeDasharray="4 4"
+          strokeWidth={1.4}
+        />
+      ) : null}
+    </g>
+  );
+}
+
+function FurnitureDetail({
+  item,
+  width,
+  depth
+}: {
+  item: FurnitureInstance;
+  width: number;
+  depth: number;
+}) {
+  if (item.definitionId === "double-bed") {
+    return (
+      <>
+        <rect
+          x={-width * 0.38}
+          y={-depth * 0.42}
+          width={width * 0.32}
+          height={depth * 0.22}
+          rx={4}
+          fill="rgba(255,255,255,0.45)"
+        />
+        <rect
+          x={width * 0.06}
+          y={-depth * 0.42}
+          width={width * 0.32}
+          height={depth * 0.22}
+          rx={4}
+          fill="rgba(255,255,255,0.45)"
+        />
+      </>
+    );
+  }
+
+  if (item.definitionId === "office-chair" || item.definitionId === "floor-lamp") {
+    return (
+      <circle
+        r={Math.min(width, depth) * 0.28}
+        fill="rgba(255,255,255,0.32)"
+        stroke="rgba(31,38,34,0.2)"
+        strokeWidth={1}
+      />
+    );
+  }
+
+  if (item.definitionId === "desk" || item.definitionId === "tv-console") {
+    return (
+      <line
+        x1={-width * 0.38}
+        x2={width * 0.38}
+        y1={-depth * 0.2}
+        y2={-depth * 0.2}
+        stroke="rgba(255,255,255,0.42)"
+        strokeLinecap="round"
+        strokeWidth={2}
+      />
+    );
+  }
+
+  return null;
 }
 
 function GridLayer({
