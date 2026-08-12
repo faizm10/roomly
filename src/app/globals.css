@@ -178,6 +178,50 @@ svg {
   color: var(--muted);
 }
 
+.panel-toggle {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cfd2ca;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #56605a;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.panel-toggle:hover {
+  border-color: #b7beb5;
+  background: #f3f5f0;
+  color: var(--accent-strong);
+}
+
+.collapsed-inspector {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 44px minmax(0, 1fr);
+  justify-items: center;
+  overflow: hidden;
+}
+
+.collapsed-inspector .panel-toggle {
+  align-self: center;
+}
+
+.collapsed-inspector-label {
+  writing-mode: vertical-rl;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .metric-chip {
   display: inline-flex;
   height: 26px;

@@ -4,6 +4,8 @@ import {
   Armchair,
   BedDouble,
   Box,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   CornerDownRight,
   Grid3X3,
@@ -19,7 +21,7 @@ import {
   Table2,
   Trash2
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BlueprintCanvas } from "@/components/blueprint/blueprint-canvas";
 import { RoomSetupPanel } from "@/components/setup/room-setup-panel";
 import {
@@ -42,6 +44,7 @@ export function RoomPlannerApp() {
   const savedState = useEditorStore((state) => state.savedState);
   const markSaving = useEditorStore((state) => state.markSaving);
   const markSaved = useEditorStore((state) => state.markSaved);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
 
   useEffect(() => {
     markSaving();
@@ -83,13 +86,23 @@ export function RoomPlannerApp() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px]">
+      <div
+        className="grid min-h-0 flex-1 transition-[grid-template-columns] duration-150 ease-out"
+        style={{
+          gridTemplateColumns: inspectorCollapsed
+            ? "minmax(0, 1fr) 44px"
+            : "minmax(0, 1fr) 300px"
+        }}
+      >
         <section className="relative min-h-0 min-w-0 overflow-hidden bg-[var(--blueprint)]">
           {mode === "setup" ? <RoomSetupPanel /> : <BlueprintCanvas />}
           <EditorDock />
         </section>
 
-        <InspectorPanel />
+        <InspectorPanel
+          collapsed={inspectorCollapsed}
+          onToggle={() => setInspectorCollapsed((collapsed) => !collapsed)}
+        />
       </div>
     </main>
   );
@@ -167,7 +180,13 @@ function EditorDock() {
   );
 }
 
-function InspectorPanel() {
+function InspectorPanel({
+  collapsed,
+  onToggle
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const room = useEditorStore((state) => state.room);
   const mode = useEditorStore((state) => state.mode);
   const selection = useEditorStore((state) => state.selection);
@@ -192,10 +211,34 @@ function InspectorPanel() {
     ? getFurnitureDefinition(selectedFurniture.definitionId)
     : null;
 
+  if (collapsed) {
+    return (
+      <aside className="collapsed-inspector border-l border-[var(--line)] bg-[var(--panel)]">
+        <button
+          aria-label="Expand properties"
+          className="panel-toggle"
+          type="button"
+          onClick={onToggle}
+        >
+          <ChevronLeft size={15} />
+        </button>
+        <div className="collapsed-inspector-label">Properties</div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="flex min-h-0 min-w-0 flex-col border-l border-[var(--line)] bg-[var(--panel)]">
-      <div className="shrink-0 border-b border-[var(--line)] px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--line)] px-4 py-3">
         <div className="panel-label">Properties</div>
+        <button
+          aria-label="Collapse properties"
+          className="panel-toggle"
+          type="button"
+          onClick={onToggle}
+        >
+          <ChevronRight size={15} />
+        </button>
       </div>
 
       <div className="inspector-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
