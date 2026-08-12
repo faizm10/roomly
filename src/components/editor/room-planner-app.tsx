@@ -189,6 +189,7 @@ function InspectorPanel({
 }) {
   const room = useEditorStore((state) => state.room);
   const mode = useEditorStore((state) => state.mode);
+  const tool = useEditorStore((state) => state.tool);
   const selection = useEditorStore((state) => state.selection);
   const updateRoomName = useEditorStore((state) => state.updateRoomName);
   const updateWallHeight = useEditorStore((state) => state.updateWallHeight);
@@ -315,11 +316,21 @@ function InspectorPanel({
             onChange={(updates) => updateFurniture(selectedFurniture.id, updates)}
             onRemove={() => removeFurniture(selectedFurniture.id)}
           />
-        ) : (
+        ) : tool === "furniture" ? (
           <FurnitureLibrary onAdd={addFurniture} />
+        ) : (
+          <RoomInspectorEmptyState />
         )}
       </div>
     </aside>
+  );
+}
+
+function RoomInspectorEmptyState() {
+  return (
+    <section className="border-t border-[var(--line)] pt-4 text-xs leading-5 text-[var(--muted)]">
+      Use the dock to edit vertices, add wall points, or open furniture.
+    </section>
   );
 }
 
