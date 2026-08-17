@@ -21,6 +21,7 @@ import { BlueprintCanvas } from "@/components/blueprint/blueprint-canvas";
 import { FurnitureProperties } from "@/components/inspector/furniture-properties";
 import { FurnitureLibrary } from "@/components/library/furniture-library";
 import { RoomSetupPanel } from "@/components/setup/room-setup-panel";
+import { SavedRoomsPanel } from "@/components/setup/saved-rooms-panel";
 import {
   ImagesBadge,
   materialPreviewImages
@@ -35,19 +36,39 @@ export function RoomPlannerApp() {
   const room = useEditorStore((state) => state.room);
   const mode = useEditorStore((state) => state.mode);
   const savedState = useEditorStore((state) => state.savedState);
+  const hydrated = useEditorStore((state) => state.hydrated);
   const markSaving = useEditorStore((state) => state.markSaving);
   const markSaved = useEditorStore((state) => state.markSaved);
+  const hydrate = useEditorStore((state) => state.hydrate);
+  const refreshSavedRooms = useEditorStore((state) => state.refreshSavedRooms);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
 
   useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
     markSaving();
     const timeout = window.setTimeout(async () => {
       await localRoomRepository.saveRoom(room);
       markSaved();
+      await refreshSavedRooms();
     }, 450);
 
     return () => window.clearTimeout(timeout);
-  }, [markSaved, markSaving, room]);
+  }, [hydrated, markSaved, markSaving, refreshSavedRooms, room]);
+
+  if (!hydrated) {
+    return (
+      <main className="flex h-[100dvh] items-center justify-center bg-[var(--background)] text-sm text-[var(--muted)]">
+        Loading rooms…
+      </main>
+    );
+  }
 
   return (
     <main className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
@@ -314,6 +335,7 @@ function InspectorPanel({
               Create exact rectangles or load the sample polygon, then refine
               vertices in Blueprint.
             </p>
+            <SavedRoomsPanel compact />
           </section>
         ) : selectedVertex ? (
           <section className="space-y-3 border-t border-[var(--line)] pt-5">
@@ -367,8 +389,11 @@ function InspectorPanel({
 
 function RoomInspectorEmptyState() {
   return (
-    <section className="border-t border-[var(--line)] pt-4 text-xs leading-5 text-[var(--muted)]">
-      Use the dock to edit vertices, add wall points, or open furniture.
+    <section className="space-y-4 border-t border-[var(--line)] pt-4">
+      <p className="text-xs leading-5 text-[var(--muted)]">
+        Use the dock to edit vertices, add wall points, or open furniture.
+      </p>
+      <SavedRoomsPanel />
     </section>
   );
 }
