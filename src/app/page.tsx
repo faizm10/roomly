@@ -1,5 +1,5 @@
-import { RoomPlannerApp } from "@/components/editor/room-planner-app";
+import { LandingPage } from "@/components/landing/landing-page";
 
 export default function Home() {
-  return <RoomPlannerApp />;
+  return <LandingPage />;
 }

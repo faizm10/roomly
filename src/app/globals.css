@@ -47,8 +47,10 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
-  overflow: hidden;
 }
+
+/* The planner clips itself at 100dvh; the landing page needs to scroll, so
+   the lock lives on the editor route rather than on <body>. */
 
 button,
 input {
