@@ -30,7 +30,10 @@
 .hand-title {
   font-family: var(--font-hand), var(--font-sans), system-ui, sans-serif;
   font-weight: 400;
-  letter-spacing: 0.01em;
+  /* Architects Daughter connects glyphs; tracking utilities lose to this
+     rule, so the open spacing has to live here. */
+  letter-spacing: 0.12em;
+  word-spacing: 0.16em;
 }
 
 * {
