@@ -2,6 +2,7 @@
 
 import { DraftingCompass, Grid2X2, MoveRight } from "lucide-react";
 import { useState } from "react";
+import { SavedRoomsPanel } from "@/components/setup/saved-rooms-panel";
 import {
   BackgroundBoxes,
   BackgroundRippleEffect,
@@ -85,6 +86,10 @@ export function RoomSetupPanel() {
               value={`${(width * 2 + depth * 2).toFixed(1)} m`}
             />
             <SetupMetric label="Vertices" value="4" />
+          </div>
+
+          <div className="mt-8">
+            <SavedRoomsPanel />
           </div>
         </div>
 
