@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { furnitureCatalog, getFurnitureDefinition } from "@/features/furniture/catalog";
+import { localRoomRepository } from "@/features/persistence/room-repository";
 import {
   createPolygonRoom,
   createRectangularRoom,
@@ -32,6 +33,9 @@ interface EditorState {
   selection: Selection;
   viewport: BlueprintViewport;
   savedState: "idle" | "saving" | "saved";
+  /** False until localStorage has been read once — blocks autosave from overwriting. */
+  hydrated: boolean;
+  savedRooms: Room[];
   past: Room[];
   future: Room[];
   /**
@@ -47,6 +51,10 @@ interface EditorState {
   setMode: (mode: EditorMode) => void;
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection) => void;
+  hydrate: () => Promise<void>;
+  refreshSavedRooms: () => Promise<void>;
+  loadRoom: (id: ID) => Promise<void>;
+  deleteSavedRoom: (id: ID) => Promise<void>;
   createSimpleRoom: (width: number, depth: number, height: number) => void;
   createLShapedRoom: () => void;
   updateRoomName: (name: string) => void;
@@ -130,6 +138,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     panY: 104
   },
   savedState: "idle",
+  hydrated: false,
+  savedRooms: [],
   past: [],
   future: [],
   pendingSnapshot: null,
@@ -179,6 +189,76 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   setTool: (tool) => set({ tool }),
   setSelection: (selection) => set({ selection }),
+  hydrate: async () => {
+    const rooms = await localRoomRepository.getRooms();
+    const lastId = await localRoomRepository.getLastRoomId();
+    const preferred =
+      rooms.find((room) => room.id === lastId) ?? rooms[0] ?? null;
+
+    if (preferred) {
+      set({
+        ...resetHistory(preferred),
+        mode: "blueprint",
+        selection: { kind: "room" },
+        viewport: { zoom: 1, panX: 124, panY: 104 },
+        savedRooms: rooms,
+        hydrated: true,
+        savedState: "saved"
+      });
+      return;
+    }
+
+    set({
+      savedRooms: [],
+      hydrated: true,
+      savedState: "idle"
+    });
+  },
+  refreshSavedRooms: async () => {
+    const rooms = await localRoomRepository.getRooms();
+    set({ savedRooms: rooms });
+  },
+  loadRoom: async (id) => {
+    const room = await localRoomRepository.getRoom(id);
+
+    if (!room) {
+      return;
+    }
+
+    await localRoomRepository.setLastRoomId(room.id);
+    set({
+      ...resetHistory(room),
+      mode: "blueprint",
+      selection: { kind: "room" },
+      viewport: { zoom: 1, panX: 124, panY: 104 },
+      savedState: "saved"
+    });
+  },
+  deleteSavedRoom: async (id) => {
+    await localRoomRepository.deleteRoom(id);
+    const rooms = await localRoomRepository.getRooms();
+    const current = get().room;
+
+    if (current.id === id) {
+      const next = rooms[0] ?? createRectangularRoom(4.2, 3.4, 2.6, "Bedroom study");
+      set({
+        ...resetHistory(next),
+        mode: rooms[0] ? "blueprint" : "setup",
+        selection: { kind: "room" },
+        viewport: { zoom: 1, panX: 124, panY: 104 },
+        savedRooms: rooms,
+        savedState: rooms[0] ? "saved" : "idle"
+      });
+
+      if (rooms[0]) {
+        await localRoomRepository.setLastRoomId(rooms[0].id);
+      }
+
+      return;
+    }
+
+    set({ savedRooms: rooms });
+  },
   createSimpleRoom: (width, depth, height) =>
     set({
       ...resetHistory(createRectangularRoom(width, depth, height, "New room")),
