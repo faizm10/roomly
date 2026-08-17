@@ -23,7 +23,7 @@ export function WordReveal({
   text,
   duration = 0.5,
   staggerDelay = 0.04,
-  className = ""
+  className = "gap-x-2 gap-y-1.5"
 }: WordRevealProps) {
   const words = text.split(/\s+/);
 
@@ -56,7 +56,7 @@ export function WordReveal({
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-10%" }}
-      className={`flex flex-wrap gap-x-2 gap-y-1.5 ${className}`}
+      className={`flex flex-wrap ${className}`}
     >
       {words.map((word, index) => (
         <motion.span key={index} variants={wordVariants} className="inline-block">

@@ -137,6 +137,12 @@ svg {
 /* Buttons are drawably now — see DrawablyButton usages. The old
    .primary/.secondary/.danger-button rules were removed with them. */
 
+/* Solid labels use --drawably-paper, which is transparent so cards don't
+   stamp a white rectangle. Put the ink back on the words. */
+.drawably-button--solid {
+  color: var(--foreground);
+}
+
 .panel-label {
   font-size: 11px;
   font-weight: 650;
