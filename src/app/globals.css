@@ -2,17 +2,35 @@
 
 :root {
   color-scheme: light;
-  --background: #f4f5f1;
-  --foreground: #1e1f1c;
-  --muted: #686d68;
-  --line: #d7d9d2;
-  --panel: #fbfbf8;
-  --panel-strong: #ffffff;
-  --accent: #286d62;
-  --accent-strong: #1f4f47;
-  --accent-soft: #e2eee9;
-  --blueprint: #eef0ec;
+  /* Warm paper and ink, so the drawably strokes read as pen on a page. */
+  --background: #f5f1e6;
+  --foreground: #23201a;
+  --muted: #6b6459;
+  --line: #ddd5c4;
+  --panel: #fbf7ed;
+  --panel-strong: #fffdf6;
+  --accent: #2c6459;
+  --accent-strong: #1f4a42;
+  --accent-soft: #e4ede6;
+  --blueprint: #f1ece0;
   --warning: #9b5d20;
+
+  /* drawably theming — the library is styled through these, never by
+     restyling its SVG paths. */
+  --drawably-stroke: var(--foreground);
+  --drawably-fill: var(--panel-strong);
+  --drawably-paper: transparent;
+  --drawably-width: 1.6;
+  --drawably-error: #8d3424;
+  --drawably-success: var(--accent);
+}
+
+/* Headings only. Body copy stays in Inter — a whole UI set in a handwriting
+   face stops being charming and starts being unreadable. */
+.hand-title {
+  font-family: var(--font-hand), var(--font-sans), system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 * {
@@ -28,9 +46,11 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
-  overflow: hidden;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
+
+/* The planner clips itself at 100dvh; the landing page needs to scroll, so
+   the lock lives on the editor route rather than on <body>. */
 
 button,
 input {
@@ -114,61 +134,8 @@ svg {
   color: #90958e;
 }
 
-.primary-button,
-.secondary-button,
-.danger-button {
-  display: inline-flex;
-  height: 38px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 7px;
-  padding: 0 14px;
-  font-size: 14px;
-  font-weight: 550;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease,
-    transform 120ms ease;
-}
-
-.primary-button {
-  border: 1px solid #1f4f47;
-  background: var(--accent-strong);
-  color: #ffffff;
-}
-
-.primary-button:hover {
-  background: #173f39;
-}
-
-.secondary-button {
-  border: 1px solid #c9ccc4;
-  background: #ffffff;
-  color: var(--foreground);
-}
-
-.secondary-button:hover {
-  border-color: #b6bbb2;
-  background: #f4f5f1;
-}
-
-.danger-button {
-  border: 1px solid #d8b7ad;
-  background: #fff8f5;
-  color: #8d3424;
-}
-
-.danger-button:hover:not(:disabled) {
-  border-color: #c58e80;
-  background: #fff0eb;
-}
-
-.danger-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.52;
-}
+/* Buttons are drawably now — see DrawablyButton usages. The old
+   .primary/.secondary/.danger-button rules were removed with them. */
 
 .panel-label {
   font-size: 11px;
@@ -534,6 +501,10 @@ svg {
 }
 
 .dimension-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
@@ -552,9 +523,9 @@ svg {
 }
 
 .dimension-suffix {
-  padding-right: 9px;
   color: var(--muted);
   font-size: 11px;
+  font-weight: 500;
 }
 
 .field-shell input {

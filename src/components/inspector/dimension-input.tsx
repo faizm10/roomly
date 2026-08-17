@@ -1,5 +1,6 @@
 "use client";
 
+import { DrawablyInput } from "drawably/react";
 import { useRef, useState } from "react";
 import { clamp, parseLengthToMeters } from "@/lib/units";
 
@@ -90,30 +91,28 @@ export function DimensionInput({
         }}
       >
         {label}
-      </span>
-      <span className="field-shell">
-        <input
-          className="text-sm"
-          disabled={disabled}
-          inputMode="decimal"
-          value={display}
-          onBlur={(event) => commit(event.target.value)}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              commit(event.currentTarget.value);
-              event.currentTarget.blur();
-              return;
-            }
-
-            if (event.key === "Escape") {
-              setDraft(null);
-              event.currentTarget.blur();
-            }
-          }}
-        />
         <span className="dimension-suffix">{suffix}</span>
       </span>
+      <DrawablyInput
+        className="text-sm"
+        disabled={disabled}
+        inputMode="decimal"
+        value={display}
+        onBlur={(event) => commit(event.target.value)}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            commit(event.currentTarget.value);
+            event.currentTarget.blur();
+            return;
+          }
+
+          if (event.key === "Escape") {
+            setDraft(null);
+            event.currentTarget.blur();
+          }
+        }}
+      />
     </label>
   );
 }
@@ -178,29 +177,27 @@ export function AngleInput({
         }}
       >
         {label}
-      </span>
-      <span className="field-shell">
-        <input
-          className="text-sm"
-          inputMode="numeric"
-          value={draft ?? String(Math.round(value))}
-          onBlur={(event) => commit(event.target.value)}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              commit(event.currentTarget.value);
-              event.currentTarget.blur();
-              return;
-            }
-
-            if (event.key === "Escape") {
-              setDraft(null);
-              event.currentTarget.blur();
-            }
-          }}
-        />
         <span className="dimension-suffix">°</span>
       </span>
+      <DrawablyInput
+        className="text-sm"
+        inputMode="numeric"
+        value={draft ?? String(Math.round(value))}
+        onBlur={(event) => commit(event.target.value)}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            commit(event.currentTarget.value);
+            event.currentTarget.blur();
+            return;
+          }
+
+          if (event.key === "Escape") {
+            setDraft(null);
+            event.currentTarget.blur();
+          }
+        }}
+      />
     </label>
   );
 }

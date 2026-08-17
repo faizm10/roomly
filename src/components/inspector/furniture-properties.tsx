@@ -1,5 +1,6 @@
 "use client";
 
+import { DrawablyButton } from "drawably/react";
 import { Copy, RotateCw, Trash2 } from "lucide-react";
 import {
   AngleInput,
@@ -196,14 +197,24 @@ export function FurnitureProperties({
       </PropertySection>
 
       <div className="properties-actions">
-        <button className="secondary-button w-full" type="button" onClick={onDuplicate}>
+        <DrawablyButton
+          className="w-full"
+          tone="neutral"
+          type="button"
+          onClick={onDuplicate}
+        >
           <Copy size={14} />
           Duplicate
-        </button>
-        <button className="danger-button w-full" type="button" onClick={onRemove}>
+        </DrawablyButton>
+        <DrawablyButton
+          className="w-full"
+          tone="danger"
+          type="button"
+          onClick={onRemove}
+        >
           <Trash2 size={14} />
           Delete
-        </button>
+        </DrawablyButton>
       </div>
     </div>
   );

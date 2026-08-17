@@ -1,5 +1,6 @@
 "use client";
 
+import { DrawablyButton, DrawablyDivider, DrawablyInput } from "drawably/react";
 import {
   Armchair,
   Box,
@@ -26,6 +27,7 @@ import {
   ImagesBadge,
   materialPreviewImages
 } from "@/components/ui/aceternity-effects";
+import { WaveDots } from "@/components/ui/amicro/wave-dots";
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { getFurnitureDefinition } from "@/features/furniture/catalog";
 import { localRoomRepository } from "@/features/persistence/room-repository";
@@ -64,8 +66,9 @@ export function RoomPlannerApp() {
 
   if (!hydrated) {
     return (
-      <main className="flex h-[100dvh] items-center justify-center bg-[var(--background)] text-sm text-[var(--muted)]">
-        Loading rooms…
+      <main className="flex h-[100dvh] flex-col items-center justify-center gap-3 bg-[var(--background)] text-[var(--muted)]">
+        <WaveDots />
+        <span className="hand-title text-base">Loading rooms…</span>
       </main>
     );
   }
@@ -78,7 +81,7 @@ export function RoomPlannerApp() {
             <Home size={17} />
           </div>
           <div>
-            <div className="text-sm font-semibold leading-4">{room.name}</div>
+            <div className="hand-title text-base leading-4">{room.name}</div>
             <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[var(--muted)]">
               <span>{room.vertices.length} vertices</span>
               <span className="size-1 rounded-full bg-[#b4b8b0]" />
@@ -303,7 +306,7 @@ function InspectorPanel({
       <div className="inspector-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold">Room</div>
+            <div className="hand-title text-base">Room</div>
             <span className="metric-chip">{room.vertices.length} points</span>
           </div>
           <ImagesBadge
@@ -325,8 +328,9 @@ function InspectorPanel({
         </section>
 
         {mode === "setup" ? (
-          <section className="space-y-3 border-t border-[var(--line)] pt-5">
-            <div className="text-sm font-semibold">Setup</div>
+          <section className="space-y-3">
+            <DrawablyDivider />
+            <div className="hand-title pt-2 text-base">Setup</div>
             <div className="grid grid-cols-2 gap-2">
               <span className="metric-chip">X/Z meters</span>
               <span className="metric-chip">Local save</span>
@@ -338,8 +342,9 @@ function InspectorPanel({
             <SavedRoomsPanel compact />
           </section>
         ) : selectedVertex ? (
-          <section className="space-y-3 border-t border-[var(--line)] pt-5">
-            <div className="text-sm font-semibold">Selected Vertex</div>
+          <section className="space-y-3">
+            <DrawablyDivider />
+            <div className="hand-title pt-2 text-base">Selected Vertex</div>
             <NumberInput
               label="X"
               suffix="m"
@@ -352,15 +357,16 @@ function InspectorPanel({
               value={selectedVertex.z}
               onChange={(value) => updateVertex(selectedVertex.id, { z: value })}
             />
-            <button
-              className="danger-button w-full"
+            <DrawablyButton
+              className="w-full"
               disabled={!canRemoveVertex}
+              tone="danger"
               type="button"
               onClick={() => removeVertex(selectedVertex.id)}
             >
               <Trash2 size={14} />
               Remove vertex
-            </button>
+            </DrawablyButton>
             {!canRemoveVertex ? (
               <p className="text-xs leading-5 text-[var(--muted)]">
                 A room needs at least three vertices.
@@ -389,8 +395,9 @@ function InspectorPanel({
 
 function RoomInspectorEmptyState() {
   return (
-    <section className="space-y-4 border-t border-[var(--line)] pt-4">
-      <p className="text-xs leading-5 text-[var(--muted)]">
+    <section className="space-y-4">
+      <DrawablyDivider />
+      <p className="pt-2 text-xs leading-5 text-[var(--muted)]">
         Use the dock to edit vertices, add wall points, or open furniture.
       </p>
       <SavedRoomsPanel />
@@ -410,13 +417,11 @@ function LabeledInput({
   return (
     <label className="grid gap-1.5 text-xs font-medium text-[var(--muted)]">
       {label}
-      <span className="field-shell">
-        <input
-          className="text-sm"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      </span>
+      <DrawablyInput
+        className="text-sm"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   );
 }
@@ -436,18 +441,18 @@ function NumberInput({
 }) {
   return (
     <label className="grid gap-1.5 text-xs font-medium text-[var(--muted)]">
-      {label}
-      <span className="field-shell">
-        <input
-          className="text-sm"
-          disabled={disabled}
-          step="0.1"
-          type="number"
-          value={Number(value.toFixed(2))}
-          onChange={(event) => onChange(Number(event.target.value))}
-        />
-        <span className="pr-2 text-[11px] text-[var(--muted)]">{suffix}</span>
+      <span className="flex items-baseline justify-between">
+        {label}
+        <span className="text-[11px]">{suffix}</span>
       </span>
+      <DrawablyInput
+        className="text-sm"
+        disabled={disabled}
+        step="0.1"
+        type="number"
+        value={Number(value.toFixed(2))}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
     </label>
   );
 }

@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  DrawablyButton,
+  DrawablyCard,
+  DrawablyDivider,
+  DrawablyInput
+} from "drawably/react";
 import { DraftingCompass, Grid2X2, MoveRight } from "lucide-react";
 import { useState } from "react";
 import { SavedRoomsPanel } from "@/components/setup/saved-rooms-panel";
@@ -9,6 +15,8 @@ import {
   ImagesBadge,
   materialPreviewImages
 } from "@/components/ui/aceternity-effects";
+import { FadeUp } from "@/components/ui/amicro/fade-up";
+import { WordReveal } from "@/components/ui/amicro/word-reveal";
 import { useEditorStore } from "@/stores/editor-store";
 
 export function RoomSetupPanel() {
@@ -27,9 +35,10 @@ export function RoomSetupPanel() {
           <div className="mb-7 flex items-start justify-between gap-6">
             <div>
               <div className="panel-label mb-2">Room Setup</div>
-              <h1 className="text-[28px] font-semibold leading-tight">
-                Create a room
-              </h1>
+              <WordReveal
+                className="hand-title text-[32px] leading-tight"
+                text="Create a room"
+              />
               <p className="mt-3 max-w-[600px] text-sm leading-6 text-[var(--muted)]">
                 Start with exact dimensions or load an irregular room to verify
                 the shared polygon model and blueprint renderer.
@@ -44,68 +53,76 @@ export function RoomSetupPanel() {
             </div>
           </div>
 
-          <form
-            className="border-t border-[var(--line)] pt-5"
-            onSubmit={(event) => {
-              event.preventDefault();
-              createSimpleRoom(width, depth, height);
-            }}
-          >
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <div className="text-base font-semibold">Simple Room</div>
-                <div className="mt-1 text-xs text-[var(--muted)]">
-                  Rectangular rooms are the fastest path into Blueprint.
+          <DrawablyDivider />
+
+          <FadeUp delay={0.05}>
+            <form
+              className="pt-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                createSimpleRoom(width, depth, height);
+              }}
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <div className="hand-title text-lg">Simple Room</div>
+                  <div className="mt-1 text-xs text-[var(--muted)]">
+                    Rectangular rooms are the fastest path into Blueprint.
+                  </div>
+                </div>
+                <DraftingCompass className="text-[var(--accent)]" size={18} />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <MetricField label="Width" value={width} onChange={setWidth} />
+                <MetricField label="Length" value={depth} onChange={setDepth} />
+                <MetricField label="Height" value={height} onChange={setHeight} />
+              </div>
+
+              <div className="mt-5 flex items-center gap-3">
+                <DrawablyButton type="submit" variant="solid">
+                  Generate Blueprint
+                  <MoveRight size={15} />
+                </DrawablyButton>
+                <div className="text-xs text-[var(--muted)]">
+                  {width.toFixed(1)} m × {depth.toFixed(1)} m floor ·{" "}
+                  {height.toFixed(1)} m walls
                 </div>
               </div>
-              <DraftingCompass className="text-[var(--accent)]" size={18} />
-            </div>
+            </form>
+          </FadeUp>
 
-            <div className="grid grid-cols-3 gap-3">
-              <MetricField label="Width" value={width} onChange={setWidth} />
-              <MetricField label="Length" value={depth} onChange={setDepth} />
-              <MetricField label="Height" value={height} onChange={setHeight} />
-            </div>
-
-            <div className="mt-5 flex items-center gap-3">
-              <button className="primary-button" type="submit">
-                Generate Blueprint
-                <MoveRight size={15} />
-              </button>
-              <div className="text-xs text-[var(--muted)]">
-                {width.toFixed(1)} m × {depth.toFixed(1)} m floor ·{" "}
-                {height.toFixed(1)} m walls
-              </div>
-            </div>
-          </form>
-
-          <div className="mt-10 grid grid-cols-3 gap-3 border-t border-[var(--line)] pt-5">
+          <div className="mt-10">
+            <DrawablyDivider />
+          </div>
+          <FadeUp className="mt-5 grid grid-cols-3 gap-3" delay={0.1}>
             <SetupMetric label="Area" value={`${(width * depth).toFixed(1)} m²`} />
             <SetupMetric
               label="Perimeter"
               value={`${(width * 2 + depth * 2).toFixed(1)} m`}
             />
             <SetupMetric label="Vertices" value="4" />
-          </div>
+          </FadeUp>
 
           <div className="mt-8">
             <SavedRoomsPanel />
           </div>
         </div>
 
-        <aside className="border-t border-[var(--line)] pt-5">
-          <div className="mb-5">
-            <div className="text-base font-semibold">Custom Polygon</div>
+        <aside>
+          <DrawablyDivider />
+          <div className="mb-5 mt-5">
+            <div className="hand-title text-lg">Custom Polygon</div>
             <div className="mt-1 text-xs text-[var(--muted)]">
               Use this sample to inspect irregular-room editing.
             </div>
           </div>
 
-          <div className="relative mb-5 overflow-hidden rounded-lg border border-[#d7d9d2] bg-white">
+          <DrawablyCard className="relative mb-5 p-0">
             <div className="absolute right-3 top-3 z-10">
               <ImagesBadge text="Room palette" images={previewImages} />
             </div>
-            <div className="border-b border-[#e5e6df] bg-[#fafaf7] px-3 py-2 text-xs font-medium text-[var(--muted)]">
+            <div className="px-3 py-2 text-xs font-medium text-[var(--muted)]">
               L-shaped room preview
             </div>
             <div className="relative h-52 p-5">
@@ -155,15 +172,16 @@ export function RoomSetupPanel() {
                 </text>
               </svg>
             </div>
-          </div>
+          </DrawablyCard>
 
-          <button
-            className="secondary-button w-full"
+          <DrawablyButton
+            className="w-full"
+            tone="neutral"
             type="button"
             onClick={createLShapedRoom}
           >
             Load L-shaped room
-          </button>
+          </DrawablyButton>
         </aside>
       </div>
     </div>
@@ -181,18 +199,18 @@ function MetricField({
 }) {
   return (
     <label className="grid gap-1.5 text-xs font-medium text-[var(--muted)]">
-      {label}
-      <span className="field-shell">
-        <input
-          className="text-sm"
-          min="0.5"
-          step="0.1"
-          type="number"
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
-        />
-        <span className="pr-2 text-[11px] text-[var(--muted)]">m</span>
+      <span className="flex items-baseline justify-between">
+        {label}
+        <span className="text-[11px]">m</span>
       </span>
+      <DrawablyInput
+        className="text-sm"
+        min="0.5"
+        step="0.1"
+        type="number"
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
     </label>
   );
 }
