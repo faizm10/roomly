@@ -81,7 +81,7 @@ export function RoomPlannerApp() {
             <Home size={17} />
           </div>
           <div>
-            <div className="hand-title text-base leading-4">{room.name}</div>
+            <div className="hand-title text-lg leading-6">{room.name}</div>
             <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[var(--muted)]">
               <span>{room.vertices.length} vertices</span>
               <span className="size-1 rounded-full bg-[#b4b8b0]" />
