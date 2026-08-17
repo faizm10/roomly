@@ -50,7 +50,7 @@ export function LandingPage() {
             <div>
               <div className="panel-label mb-3">Room planner</div>
               <WordReveal
-                className="hand-title gap-x-5 gap-y-3 text-[40px] leading-[1.45] tracking-[0.16em] md:text-[52px]"
+                className="hand-title gap-x-6 gap-y-3 text-[40px] leading-[1.45] md:text-[52px]"
                 text="Plan a room on paper."
               />
               <FadeUp delay={0.15}>
