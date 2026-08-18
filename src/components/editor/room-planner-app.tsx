@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   CornerDownRight,
   Grid3X3,
-  Home,
   MousePointer2,
   Move,
   Redo2,
@@ -17,6 +16,7 @@ import {
   Trash2,
   Undo2
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BlueprintCanvas } from "@/components/blueprint/blueprint-canvas";
 import { FurnitureProperties } from "@/components/inspector/furniture-properties";
@@ -27,6 +27,7 @@ import {
   ImagesBadge,
   materialPreviewImages
 } from "@/components/ui/aceternity-effects";
+import { RoomlyLogo } from "@/components/brand/roomly-logo";
 import { WaveDots } from "@/components/ui/amicro/wave-dots";
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { getFurnitureDefinition } from "@/features/furniture/catalog";
@@ -77,9 +78,13 @@ export function RoomPlannerApp() {
     <main className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--line)] bg-[var(--panel)] px-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--accent-strong)] text-white">
-            <Home size={17} />
-          </div>
+          <Link
+            aria-label="Roomly home"
+            className="text-[var(--foreground)]"
+            href="/"
+          >
+            <RoomlyLogo className="h-8 w-auto" />
+          </Link>
           <div>
             <div className="hand-title text-lg leading-6">{room.name}</div>
             <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[var(--muted)]">
