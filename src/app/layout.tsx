@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
-import { Architects_Daughter, Inter, Geist_Mono } from "next/font/google";
+import { Architects_Daughter, Inter, Geist_Mono, Geist } from "next/font/google";
 import "drawably/style.css";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
 // drawably ships no font files; Inter is the type it is drawn against.
-const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"]
-});
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 // The display face for headings — an architect's hand, to match the sketch chrome.
 const architectsDaughter = Architects_Daughter({
@@ -32,9 +30,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
       <body
-        className={`${inter.variable} ${architectsDaughter.variable} ${geistMono.variable}`}
+        className={`${geist.variable} ${architectsDaughter.variable} ${geistMono.variable}`}
       >
         {children}
       </body>
