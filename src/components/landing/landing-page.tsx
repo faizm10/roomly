@@ -1,13 +1,15 @@
 "use client";
 
-import { DrawablyButton, DrawablyCard, DrawablyDivider } from "drawably/react";
+import { DrawablyCard, DrawablyDivider } from "drawably/react";
 import { MotionConfig } from "framer-motion";
-import { ArrowRight, Armchair, PencilLine, Save } from "lucide-react";
+import { Armchair, ArrowRight, PencilLine, Save, Star } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FadeUp } from "@/components/ui/amicro/fade-up";
-import { WordReveal } from "@/components/ui/amicro/word-reveal";
+import { RoomlyLogo } from "@/components/brand/roomly-logo";
 import { RoomSketch } from "@/components/landing/room-sketch";
+import { FadeUp } from "@/components/ui/amicro/fade-up";
+import { SparkleButton } from "@/components/ui/amicro/sparkle-button";
+import { WordReveal } from "@/components/ui/amicro/word-reveal";
 
 const notes = [
   {
@@ -36,7 +38,13 @@ export function LandingPage() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-[100dvh] bg-[var(--background)] text-[var(--foreground)]">
         <header className="mx-auto flex max-w-[1000px] items-center justify-between px-6 py-6">
-          <span className="hand-title text-xl">Roomly</span>
+          <Link
+            className="flex items-center gap-2.5 text-[var(--foreground)]"
+            href="/"
+          >
+            <RoomlyLogo className="h-7 w-auto" />
+            <span className="hand-title text-xl">Roomly</span>
+          </Link>
           <Link
             className="text-sm text-[var(--muted)] underline-offset-4 hover:text-[var(--foreground)] hover:underline"
             href="/dashboard"
@@ -60,14 +68,13 @@ export function LandingPage() {
                   without pretending your living room is a perfect rectangle.
                 </p>
                 <div className="mt-8 flex flex-wrap items-center gap-4">
-                  <DrawablyButton
-                    type="button"
-                    variant="solid"
+                  <SparkleButton
+                    hoverIcon={Star}
+                    idleIcon={ArrowRight}
                     onClick={() => router.push("/dashboard")}
                   >
                     Go to the dashboard
-                    <ArrowRight size={15} />
-                  </DrawablyButton>
+                  </SparkleButton>
                   <span className="text-xs text-[var(--muted)]">
                     No account. Saves in this browser.
                   </span>
