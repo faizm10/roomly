@@ -1,0 +1,97 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, ExternalLink, MapPin, Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { PLACE_CATEGORIES, type Place, type PlaceCategory, type PlaceSearchResult } from "@/lib/types";
+
+type AddPlaceDialogProps = {
+  destination: string;
+  onAdd: (place: Place) => void;
+  onClose: () => void;
+};
+
+export function AddPlaceDialog({ destination, onAdd, onClose }: AddPlaceDialogProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<PlaceSearchResult | null>(null);
+  const [category, setCategory] = useState<PlaceCategory>("Other");
+  const [note, setNote] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  const search = useQuery({
+    queryKey: ["place-search", query, destination],
+    queryFn: async () => {
+      const response = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(query)}&near=${encodeURIComponent(destination)}`);
+      if (!response.ok) throw new Error("Search is taking the scenic route. Try again.");
+      return (await response.json()) as { results: PlaceSearchResult[]; demo: boolean };
+    },
+    enabled: query.trim().length >= 2,
+  });
+
+  function choose(place: PlaceSearchResult) {
+    setSelected(place);
+    setCategory(place.category);
+  }
+
+  function save() {
+    if (!selected) return;
+    onAdd({
+      ...selected,
+      id: `local-${Date.now()}`,
+      category,
+      note,
+      sourceUrl: sourceUrl || undefined,
+      saved: true,
+      addedBy: "FM",
+    });
+    onClose();
+  }
+
+  return (
+    <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="place-dialog" role="dialog" aria-modal="true" aria-labelledby="add-place-title">
+        <header>
+          {selected ? <button className="icon-button" onClick={() => setSelected(null)} aria-label="Back to search"><ArrowLeft size={19} /></button> : <span className="dialog-step">Add a place</span>}
+          <button className="icon-button" onClick={onClose} aria-label="Close"><X size={20} /></button>
+        </header>
+        {!selected ? (
+          <>
+            <h2 id="add-place-title">What&apos;s worth a stop?</h2>
+            <div className="place-search-box"><Search size={20} /><input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${destination}`} aria-label="Search places" /></div>
+            <p className="search-hint">Search a restaurant, shop, landmark, or address.</p>
+            <div className="search-results" aria-live="polite">
+              {search.isFetching && <p className="search-state">Looking around…</p>}
+              {search.isError && <p className="form-error">{search.error.message}</p>}
+              {search.data?.results.map((place) => (
+                <button className="search-result" onClick={() => choose(place)} key={place.fsqPlaceId} type="button">
+                  <span className="result-pin"><MapPin size={17} /></span>
+                  <span><strong>{place.name}</strong><small>{place.address} · {place.neighborhood}</small></span>
+                  <span className="result-category">{place.category}</span>
+                </button>
+              ))}
+              {query.length < 2 && <div className="search-empty"><span>PASTE IT.<br />FIND IT.<br />PIN IT.</span></div>}
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="eyebrow">New save</p>
+            <h2 id="add-place-title">{selected.name}</h2>
+            <p className="selected-address"><MapPin size={15} /> {selected.address}</p>
+            <label className="field-label"><span>Category</span><select value={category} onChange={(event) => setCategory(event.target.value as PlaceCategory)}>{PLACE_CATEGORIES.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label className="field-label"><span>Your note</span><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Why did you save this? What should the group know?" rows={4} maxLength={500} /></label>
+            <label className="field-label"><span>Where you found it <small>(optional)</small></span><div className="url-input"><ExternalLink size={16} /><input type="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="Instagram, TikTok, article…" /></div></label>
+            <button className="button button-ink button-full" onClick={save} type="button">Save to trip <MapPin size={17} /></button>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
