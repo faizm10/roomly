@@ -1,0 +1,140 @@
+import type { Place, PlaceSearchResult, Trip } from "@/lib/types";
+
+export const demoPlaces: Place[] = [
+  {
+    id: "p-1",
+    fsqPlaceId: "demo-prado",
+    name: "Prado Mercearia",
+    address: "R. das Pedras Negras 2",
+    neighborhood: "Baixa",
+    category: "Eat",
+    note: "Go for a late lunch. Ana says the mushroom toast is non-negotiable.",
+    sourceUrl: "https://www.instagram.com/",
+    coordinates: [-9.1349, 38.7107],
+    saved: true,
+    addedBy: "FM",
+  },
+  {
+    id: "p-2",
+    fsqPlaceId: "demo-gulbenkian",
+    name: "Gulbenkian Garden",
+    address: "Av. de Berna 45A",
+    neighborhood: "Avenidas Novas",
+    category: "See",
+    note: "Slow morning, sculpture garden, then coffee nearby.",
+    coordinates: [-9.1544, 38.7367],
+    saved: true,
+    addedBy: "AS",
+  },
+  {
+    id: "p-3",
+    fsqPlaceId: "demo-seagull",
+    name: "Seagull Method Café",
+    address: "R. da Palmeira 23",
+    neighborhood: "Príncipe Real",
+    category: "Drink",
+    note: "Breakfast before walking down to Chiado.",
+    sourceUrl: "https://www.tiktok.com/",
+    coordinates: [-9.1507, 38.7162],
+    saved: true,
+    addedBy: "JK",
+  },
+  {
+    id: "p-4",
+    fsqPlaceId: "demo-feira",
+    name: "Feira da Ladra",
+    address: "Campo de Santa Clara",
+    neighborhood: "Alfama",
+    category: "Shop",
+    note: "Tuesday flea market. Look for old Portuguese ceramics.",
+    coordinates: [-9.1256, 38.7151],
+    saved: true,
+    addedBy: "FM",
+  },
+  {
+    id: "p-5",
+    fsqPlaceId: "demo-ponto-final",
+    name: "Ponto Final",
+    address: "R. do Ginjal 72",
+    neighborhood: "Almada",
+    category: "Eat",
+    note: "Book sunset dinner and take the ferry back.",
+    coordinates: [-9.1462, 38.6847],
+    saved: true,
+    addedBy: "AS",
+  },
+];
+
+export const demoTrips: Trip[] = [
+  {
+    id: "lisbon-weekender",
+    title: "Lisbon, loosely",
+    destination: "Lisbon",
+    country: "Portugal",
+    dateLabel: "SEP 18—22",
+    startDate: "2026-09-18",
+    endDate: "2026-09-22",
+    places: demoPlaces,
+    collaborators: [
+      { initials: "FM", name: "Faiz" },
+      { initials: "AS", name: "Ana" },
+      { initials: "JK", name: "Jon" },
+    ],
+  },
+  {
+    id: "kyoto-after-dark",
+    title: "Kyoto after dark",
+    destination: "Kyoto",
+    country: "Japan",
+    dateLabel: "NOV 03—09",
+    startDate: "2026-11-03",
+    endDate: "2026-11-09",
+    places: demoPlaces.slice(0, 3),
+    collaborators: [{ initials: "FM", name: "Faiz" }],
+  },
+  {
+    id: "montreal-summer",
+    title: "Montréal, no agenda",
+    destination: "Montréal",
+    country: "Canada",
+    dateLabel: "JUL 10—13",
+    startDate: "2027-07-10",
+    endDate: "2027-07-13",
+    places: demoPlaces.slice(0, 4),
+    collaborators: [
+      { initials: "FM", name: "Faiz" },
+      { initials: "RB", name: "Rae" },
+    ],
+  },
+];
+
+export const demoSearchResults: PlaceSearchResult[] = [
+  ...demoPlaces.map(({ fsqPlaceId, name, address, neighborhood, coordinates, category }) => ({
+    fsqPlaceId,
+    name,
+    address,
+    neighborhood,
+    coordinates,
+    category,
+  })),
+  {
+    fsqPlaceId: "demo-manteigaria",
+    name: "Manteigaria",
+    address: "R. do Loreto 2",
+    neighborhood: "Chiado",
+    coordinates: [-9.1438, 38.7107],
+    category: "Eat",
+  },
+  {
+    fsqPlaceId: "demo-fabrica",
+    name: "Fábrica Coffee Roasters",
+    address: "R. das Portas de Santo Antão 136",
+    neighborhood: "Rossio",
+    coordinates: [-9.1409, 38.7164],
+    category: "Drink",
+  },
+];
+
+export function getTrip(id: string) {
+  return demoTrips.find((trip) => trip.id === id) ?? demoTrips[0];
+}
