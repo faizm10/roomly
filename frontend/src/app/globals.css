@@ -107,6 +107,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--paper);
   cursor: pointer;
 }
+.trip-options { border-color: var(--ink); flex: none; }
 
 /* Marketing */
 .landing-page { overflow: clip; }
@@ -403,9 +404,10 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .trip-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .trip-title-row h1 { margin: 8px 0 0; font-family: var(--font-handwritten), cursive; font-size: clamp(42px, 4vw, 60px); font-weight: 700; line-height: .95; }
 .collab-row { display: flex; margin-top: 24px; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; }
-.mini-avatars { display: flex; }
-.mini-avatars span { display: grid; width: 30px; height: 30px; margin-left: -6px; place-items: center; border: 1px solid var(--ink); border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 8px; font-weight: 700; }
-.mini-avatars span:first-child { margin-left: 0; }
+.mini-avatars { display: flex; align-items: center; }
+.mini-avatar { display: grid; width: 30px; height: 30px; margin-left: -6px; place-items: center; overflow: hidden; border: 1px solid var(--ink); border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 8px; font-weight: 700; }
+.mini-avatars .mini-avatar:first-child { margin-left: 0; }
+.mini-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .collab-row > button { display: inline-flex; margin-left: auto; align-items: center; gap: 6px; border: 0; border-bottom: 1px solid var(--ink); background: transparent; font-size: 11px; cursor: pointer; }
 .filter-scroll { display: flex; margin-top: 28px; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .filter-scroll::-webkit-scrollbar { display: none; }
@@ -499,6 +501,8 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .place-dialog > header { display: flex; margin-bottom: 24px; align-items: center; justify-content: space-between; }
 .dialog-step { color: var(--muted); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
 .place-dialog h2, .nav-dialog h2 { margin: 10px 0 25px; font-family: var(--font-handwritten), cursive; font-size: 44px; line-height: 1; }
+.logistics-dialog .new-trip-form { width: 100%; }
+.logistics-dialog .new-trip-form .button { margin-top: 6px; }
 .place-search-box { display: flex; padding: 0 14px; align-items: center; gap: 10px; border: 1px solid var(--ink); background: var(--paper); }
 .place-search-box input { min-height: 52px; padding: 0; border: 0; outline: none; }
 .search-hint { margin: 12px 0 16px; color: var(--muted); font-size: 11px; }
@@ -635,9 +639,7 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 
   .places-panel-header { padding: 21px 17px 0; }
   .trip-title-row h1 { font-size: 40px; }
-  .trip-title-row .icon-button { display: none; }
   .collab-row { margin-top: 17px; }
-  .collab-row > span { display: none; }
   .filter-scroll { margin-top: 20px; }
   .place-list { padding: 0 17px 76px; }
   .saved-place { min-height: 230px; grid-template-columns: 28px 78px 1fr 28px; gap: 10px; }
