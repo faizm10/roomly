@@ -35,7 +35,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${body.variable} ${handwritten.variable}`}>
+    <html lang="en" className={`${body.variable} ${handwritten.variable}`} data-scroll-behavior="smooth" suppressHydrationWarning>
       <body>
         <AppProviders>
           <OfflineBanner />

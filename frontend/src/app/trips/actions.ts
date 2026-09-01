@@ -60,6 +60,15 @@ function optionalValue(value?: string) {
   return value?.trim() || null;
 }
 
+function isPlanningSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /trip_cities|trip_day_notes|city_id|planned_date|day_sort_order|relation .* does not exist|column .* does not exist/i.test(message);
+}
+
+function planningMigrationError() {
+  return new Error("Day planning needs the latest database migration before it can be saved.");
+}
+
 export async function createTrip(input: unknown) {
   const viewer = await requireViewer();
   const data = createTripSchema.parse(input);
@@ -77,6 +86,11 @@ export async function createTrip(input: unknown) {
       displayName: viewer.name?.trim() || "Traveller",
       image: viewer.image || null,
     });
+  } catch (error) {
+    await db.delete(trips).where(eq(trips.id, trip.id));
+    throw error;
+  }
+  try {
     await db.insert(tripCities).values({
       tripId: trip.id,
       name: data.destination.split(",")[0]?.trim() || data.destination,
@@ -86,8 +100,10 @@ export async function createTrip(input: unknown) {
       sortOrder: 0,
     });
   } catch (error) {
-    await db.delete(trips).where(eq(trips.id, trip.id));
-    throw error;
+    if (!isPlanningSchemaMissing(error)) {
+      await db.delete(trips).where(eq(trips.id, trip.id));
+      throw error;
+    }
   }
   revalidatePath("/trips");
   return { id: trip.id, demo: false };
@@ -104,25 +120,29 @@ export async function addPlace(input: unknown) {
     .from(tripPlaces)
     .where(eq(tripPlaces.tripId, data.tripId));
   try {
+    const values = {
+      tripId: data.tripId,
+      fsqPlaceId: data.fsqPlaceId,
+      name: data.name,
+      address: data.address,
+      neighborhood: data.neighborhood,
+      longitude: data.longitude,
+      latitude: data.latitude,
+      category: data.category,
+      note: data.note,
+      sourceUrl: data.sourceUrl || null,
+      saved: data.saved,
+      sortOrder: Number(order?.next ?? 0),
+      addedBy: viewer.id,
+    };
     const [saved] = await db
       .insert(tripPlaces)
-      .values({
-        tripId: data.tripId,
-        cityId: optionalValue(data.cityId),
-        fsqPlaceId: data.fsqPlaceId,
-        name: data.name,
-        address: data.address,
-        neighborhood: data.neighborhood,
-        longitude: data.longitude,
-        latitude: data.latitude,
-        category: data.category,
-        note: data.note,
-        sourceUrl: data.sourceUrl || null,
-        saved: data.saved,
-        sortOrder: Number(order?.next ?? 0),
-        addedBy: viewer.id,
-      })
-      .returning({ id: tripPlaces.id });
+      .values({ ...values, cityId: optionalValue(data.cityId) })
+      .returning({ id: tripPlaces.id })
+      .catch(async (error) => {
+        if (!isPlanningSchemaMissing(error)) throw error;
+        return db.insert(tripPlaces).values(values).returning({ id: tripPlaces.id });
+      });
     revalidateTrip(data.tripId);
     return { demo: false, id: saved.id };
   } catch (error) {
@@ -157,6 +177,14 @@ export async function updatePlacePlanning(input: unknown) {
   if (!db) return { demo: true };
   await requireEditor(data.tripId, viewer.id);
   const plannedDate = optionalValue(data.plannedDate);
+  if (plannedDate || data.cityId) {
+    try {
+      await db.select({ id: tripCities.id }).from(tripCities).where(eq(tripCities.tripId, data.tripId)).limit(1);
+    } catch (error) {
+      if (isPlanningSchemaMissing(error)) throw planningMigrationError();
+      throw error;
+    }
+  }
   const [updated] = await db
     .update(tripPlaces)
     .set({
@@ -188,6 +216,12 @@ export async function addTripCity(input: unknown) {
   const db = getDatabase();
   if (!db) return { demo: true };
   await requireEditor(data.tripId, viewer.id);
+  try {
+    await db.select({ id: tripCities.id }).from(tripCities).where(eq(tripCities.tripId, data.tripId)).limit(1);
+  } catch (error) {
+    if (isPlanningSchemaMissing(error)) throw planningMigrationError();
+    throw error;
+  }
   const [order] = await db
     .select({ next: sql<number>`coalesce(max(${tripCities.sortOrder}), -1) + 1` })
     .from(tripCities)
@@ -213,6 +247,12 @@ export async function updateTripCity(input: unknown) {
   const db = getDatabase();
   if (!db) return { demo: true };
   await requireEditor(data.tripId, viewer.id);
+  try {
+    await db.select({ id: tripCities.id }).from(tripCities).where(eq(tripCities.tripId, data.tripId)).limit(1);
+  } catch (error) {
+    if (isPlanningSchemaMissing(error)) throw planningMigrationError();
+    throw error;
+  }
   const [updated] = await db
     .update(tripCities)
     .set({
@@ -235,6 +275,12 @@ export async function removeTripCity(input: unknown) {
   const db = getDatabase();
   if (!db) return { demo: true };
   await requireEditor(data.tripId, viewer.id);
+  try {
+    await db.select({ id: tripCities.id }).from(tripCities).where(eq(tripCities.tripId, data.tripId)).limit(1);
+  } catch (error) {
+    if (isPlanningSchemaMissing(error)) throw planningMigrationError();
+    throw error;
+  }
   await db
     .update(tripPlaces)
     .set({ cityId: null, plannedDate: null, daySortOrder: 0 })
@@ -254,6 +300,12 @@ export async function addDayNote(input: unknown) {
   const db = getDatabase();
   if (!db) return { demo: true };
   await requireEditor(data.tripId, viewer.id);
+  try {
+    await db.select({ id: tripDayNotes.id }).from(tripDayNotes).where(eq(tripDayNotes.tripId, data.tripId)).limit(1);
+  } catch (error) {
+    if (isPlanningSchemaMissing(error)) throw planningMigrationError();
+    throw error;
+  }
   const [order] = await db
     .select({ next: sql<number>`coalesce(max(${tripDayNotes.sortOrder}), -1) + 1` })
     .from(tripDayNotes)
@@ -279,6 +331,12 @@ export async function updateDayNote(input: unknown) {
   const db = getDatabase();
   if (!db) return { demo: true };
   await requireEditor(data.tripId, viewer.id);
+  try {
+    await db.select({ id: tripDayNotes.id }).from(tripDayNotes).where(eq(tripDayNotes.tripId, data.tripId)).limit(1);
+  } catch (error) {
+    if (isPlanningSchemaMissing(error)) throw planningMigrationError();
+    throw error;
+  }
   const [updated] = await db
     .update(tripDayNotes)
     .set({
@@ -300,6 +358,12 @@ export async function removeDayNote(input: unknown) {
   const db = getDatabase();
   if (!db) return { demo: true };
   await requireEditor(data.tripId, viewer.id);
+  try {
+    await db.select({ id: tripDayNotes.id }).from(tripDayNotes).where(eq(tripDayNotes.tripId, data.tripId)).limit(1);
+  } catch (error) {
+    if (isPlanningSchemaMissing(error)) throw planningMigrationError();
+    throw error;
+  }
   await db.delete(tripDayNotes).where(and(eq(tripDayNotes.id, data.noteId), eq(tripDayNotes.tripId, data.tripId)));
   revalidateTrip(data.tripId);
   return { demo: false };

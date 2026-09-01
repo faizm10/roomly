@@ -36,6 +36,11 @@ function destinationParts(destination: string) {
   };
 }
 
+function isPlanningSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /trip_cities|trip_day_notes|city_id|planned_date|day_sort_order|relation .* does not exist|column .* does not exist/i.test(message);
+}
+
 function toCityStop(row: {
   id: string;
   name: string;
@@ -161,19 +166,32 @@ export async function listViewerTrips(viewer: TripViewer): Promise<Trip[]> {
     })
     .from(tripMembers)
     .where(inArray(tripMembers.tripId, tripIds));
-  const cities = await db
-    .select({
-      id: tripCities.id,
-      tripId: tripCities.tripId,
-      name: tripCities.name,
-      country: tripCities.country,
-      startDate: tripCities.startDate,
-      endDate: tripCities.endDate,
-      sortOrder: tripCities.sortOrder,
-    })
-    .from(tripCities)
-    .where(inArray(tripCities.tripId, tripIds))
-    .orderBy(tripCities.sortOrder);
+  let cities: {
+    id: string;
+    tripId: string;
+    name: string;
+    country: string;
+    startDate: string | Date | null;
+    endDate: string | Date | null;
+    sortOrder: number;
+  }[] = [];
+  try {
+    cities = await db
+      .select({
+        id: tripCities.id,
+        tripId: tripCities.tripId,
+        name: tripCities.name,
+        country: tripCities.country,
+        startDate: tripCities.startDate,
+        endDate: tripCities.endDate,
+        sortOrder: tripCities.sortOrder,
+      })
+      .from(tripCities)
+      .where(inArray(tripCities.tripId, tripIds))
+      .orderBy(tripCities.sortOrder);
+  } catch (error) {
+    if (!isPlanningSchemaMissing(error)) throw error;
+  }
   const membersByTrip = new Map<string, typeof members>();
   for (const member of members) {
     const list = membersByTrip.get(member.tripId) ?? [];
@@ -225,66 +243,127 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
     ...row,
     collaborators: sortPlanners(members).map((member) => toCollaborator(member, viewer)),
   });
-  const cityRows = await db
-    .select({
-      id: tripCities.id,
-      name: tripCities.name,
-      country: tripCities.country,
-      startDate: tripCities.startDate,
-      endDate: tripCities.endDate,
-      sortOrder: tripCities.sortOrder,
-    })
-    .from(tripCities)
-    .where(eq(tripCities.tripId, tripId))
-    .orderBy(tripCities.sortOrder);
+  let planningSchemaAvailable = true;
+  let cityRows: {
+    id: string;
+    name: string;
+    country: string;
+    startDate: string | Date | null;
+    endDate: string | Date | null;
+    sortOrder: number;
+  }[] = [];
+  try {
+    cityRows = await db
+      .select({
+        id: tripCities.id,
+        name: tripCities.name,
+        country: tripCities.country,
+        startDate: tripCities.startDate,
+        endDate: tripCities.endDate,
+        sortOrder: tripCities.sortOrder,
+      })
+      .from(tripCities)
+      .where(eq(tripCities.tripId, tripId))
+      .orderBy(tripCities.sortOrder);
+  } catch (error) {
+    if (!isPlanningSchemaMissing(error)) throw error;
+    planningSchemaAvailable = false;
+  }
   trip.cities = cityRows.map(toCityStop);
   if (!trip.cities.length) trip.cities = [fallbackCity(row)];
   trip.destination = formatCitySummary(trip.cities, row.destination);
   trip.country = trip.cities[0]?.country || countryFromDestination(row.destination);
-  const savedPlaces = await db
-    .select({
-      id: tripPlaces.id,
-      fsqPlaceId: tripPlaces.fsqPlaceId,
-      cityId: tripPlaces.cityId,
-      name: tripPlaces.name,
-      address: tripPlaces.address,
-      neighborhood: tripPlaces.neighborhood,
-      longitude: tripPlaces.longitude,
-      latitude: tripPlaces.latitude,
-      category: tripPlaces.category,
-      note: tripPlaces.note,
-      sourceUrl: tripPlaces.sourceUrl,
-      saved: tripPlaces.saved,
-      plannedDate: tripPlaces.plannedDate,
-      daySortOrder: tripPlaces.daySortOrder,
-      addedBy: tripPlaces.addedBy,
-    })
-    .from(tripPlaces)
-    .where(eq(tripPlaces.tripId, tripId))
-    .orderBy(tripPlaces.sortOrder);
+  let savedPlaces: {
+    id: string;
+    fsqPlaceId: string;
+    cityId: string | null;
+    name: string;
+    address: string;
+    neighborhood: string;
+    longitude: number;
+    latitude: number;
+    category: string;
+    note: string;
+    sourceUrl: string | null;
+    saved: boolean;
+    plannedDate: string | Date | null;
+    daySortOrder: number;
+    addedBy: string;
+  }[];
+  try {
+    savedPlaces = await db
+      .select({
+        id: tripPlaces.id,
+        fsqPlaceId: tripPlaces.fsqPlaceId,
+        cityId: tripPlaces.cityId,
+        name: tripPlaces.name,
+        address: tripPlaces.address,
+        neighborhood: tripPlaces.neighborhood,
+        longitude: tripPlaces.longitude,
+        latitude: tripPlaces.latitude,
+        category: tripPlaces.category,
+        note: tripPlaces.note,
+        sourceUrl: tripPlaces.sourceUrl,
+        saved: tripPlaces.saved,
+        plannedDate: tripPlaces.plannedDate,
+        daySortOrder: tripPlaces.daySortOrder,
+        addedBy: tripPlaces.addedBy,
+      })
+      .from(tripPlaces)
+      .where(eq(tripPlaces.tripId, tripId))
+      .orderBy(tripPlaces.sortOrder);
+  } catch (error) {
+    if (!isPlanningSchemaMissing(error)) throw error;
+    planningSchemaAvailable = false;
+    savedPlaces = (await db
+      .select({
+        id: tripPlaces.id,
+        fsqPlaceId: tripPlaces.fsqPlaceId,
+        name: tripPlaces.name,
+        address: tripPlaces.address,
+        neighborhood: tripPlaces.neighborhood,
+        longitude: tripPlaces.longitude,
+        latitude: tripPlaces.latitude,
+        category: tripPlaces.category,
+        note: tripPlaces.note,
+        sourceUrl: tripPlaces.sourceUrl,
+        saved: tripPlaces.saved,
+        addedBy: tripPlaces.addedBy,
+      })
+      .from(tripPlaces)
+      .where(eq(tripPlaces.tripId, tripId))
+      .orderBy(tripPlaces.sortOrder)).map((place) => ({
+        ...place,
+        cityId: null,
+        plannedDate: null,
+        daySortOrder: 0,
+      }));
+  }
   const namesByUser = new Map(
     trip.collaborators.flatMap((person) => (person.id ? [[person.id, person.name] as const] : [])),
   );
-  const dayNotes = await db
-    .select({
-      id: tripDayNotes.id,
-      cityId: tripDayNotes.cityId,
-      plannedDate: tripDayNotes.plannedDate,
-      note: tripDayNotes.note,
-      sortOrder: tripDayNotes.sortOrder,
-      addedBy: tripDayNotes.addedBy,
-    })
-    .from(tripDayNotes)
-    .where(eq(tripDayNotes.tripId, tripId))
-    .orderBy(tripDayNotes.plannedDate, tripDayNotes.sortOrder);
-  trip.dayNotes = dayNotes.map((note) => ({
-    id: note.id,
-    cityId: note.cityId,
-    plannedDate: asIsoDate(note.plannedDate),
-    note: note.note,
-    sortOrder: note.sortOrder,
-    addedBy: namesByUser.get(note.addedBy) || note.addedBy,
-  }));
+  if (planningSchemaAvailable) {
+    const dayNotes = await db
+      .select({
+        id: tripDayNotes.id,
+        cityId: tripDayNotes.cityId,
+        plannedDate: tripDayNotes.plannedDate,
+        note: tripDayNotes.note,
+        sortOrder: tripDayNotes.sortOrder,
+        addedBy: tripDayNotes.addedBy,
+      })
+      .from(tripDayNotes)
+      .where(eq(tripDayNotes.tripId, tripId))
+      .orderBy(tripDayNotes.plannedDate, tripDayNotes.sortOrder);
+    trip.dayNotes = dayNotes.map((note) => ({
+      id: note.id,
+      cityId: note.cityId,
+      plannedDate: asIsoDate(note.plannedDate),
+      note: note.note,
+      sortOrder: note.sortOrder,
+      addedBy: namesByUser.get(note.addedBy) || note.addedBy,
+    }));
+  }
   trip.places = savedPlaces.map((place) => ({
     id: place.id,
     fsqPlaceId: place.fsqPlaceId,
