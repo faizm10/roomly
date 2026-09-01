@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getNeonAuth } from "@/lib/auth";
-import { signInSchema, signUpSchema } from "@/lib/validators";
+import { accountNameSchema, signInSchema, signUpSchema } from "@/lib/validators";
 
 export type AuthFormState = {
   error: string;
@@ -72,4 +72,37 @@ export async function signUpWithEmail(
   }
 
   redirect("/trips");
+}
+
+export type AccountFormState = { error: string; name?: string } | null;
+
+export async function updateAccountName(
+  _prev: AccountFormState,
+  formData: FormData,
+): Promise<AccountFormState> {
+  const parsed = accountNameSchema.safeParse({ name: formData.get("name") });
+  if (!parsed.success) {
+    return {
+      error: parsed.error.issues[0]?.message ?? "Check your name.",
+      name: String(formData.get("name") ?? ""),
+    };
+  }
+
+  const auth = getNeonAuth();
+  if (!auth) {
+    return { error: "Your account cannot be updated right now.", name: parsed.data.name };
+  }
+
+  const { error } = await auth.updateUser({ name: parsed.data.name });
+  if (error) {
+    return { error: error.message || "Your name could not be saved.", name: parsed.data.name };
+  }
+
+  redirect("/account");
+}
+
+export async function signOut() {
+  const auth = getNeonAuth();
+  if (auth) await auth.signOut();
+  redirect("/sign-in");
 }
