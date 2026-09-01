@@ -33,6 +33,8 @@ export const tripMembers = pgTable(
     tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
     userId: text("user_id").notNull(),
     role: memberRole("role").notNull().default("editor"),
+    displayName: text("display_name").notNull().default("Traveller"),
+    image: text("image"),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
