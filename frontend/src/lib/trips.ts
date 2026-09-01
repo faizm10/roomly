@@ -1,21 +1,31 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { countryFromDestination, formatDateLabel } from "@/lib/dates";
 import { getDatabase } from "@/lib/db";
 import { tripMembers, tripPlaces, trips } from "@/lib/db/schema";
-import type { PlaceCategory, Trip } from "@/lib/types";
+import type { Collaborator, PlaceCategory, Trip, TripViewer } from "@/lib/types";
 
 function asIsoDate(value: string | Date) {
   if (typeof value === "string") return value.slice(0, 10);
   return value.toISOString().slice(0, 10);
 }
 
-function formatDateLabel(startDate: string, endDate: string) {
-  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-  const monthName = (iso: string) => months[Number(iso.slice(5, 7)) - 1] ?? "";
-  const day = (iso: string) => String(Number(iso.slice(8, 10)));
-  if (startDate.slice(0, 7) === endDate.slice(0, 7)) {
-    return `${monthName(startDate)} ${day(startDate)}—${day(endDate)}`;
-  }
-  return `${monthName(startDate)} ${day(startDate)}—${monthName(endDate)} ${day(endDate)}`;
+function toCollaborator(
+  member: { userId: string; displayName: string; image: string | null; role: "owner" | "editor" },
+  viewer?: TripViewer,
+): Collaborator {
+  const isViewer = member.userId === viewer?.id;
+  return {
+    id: member.userId,
+    name: (isViewer ? viewer?.name : member.displayName) || member.displayName || "Traveller",
+    image: (isViewer ? viewer?.image : member.image) ?? member.image,
+  };
+}
+
+function sortPlanners<T extends { role: "owner" | "editor"; joinedAt?: Date | string }>(members: T[]) {
+  return [...members].sort((left, right) => {
+    if (left.role === right.role) return 0;
+    return left.role === "owner" ? -1 : 1;
+  });
 }
 
 function toTrip(row: {
@@ -25,17 +35,16 @@ function toTrip(row: {
   startDate: string | Date;
   endDate: string | Date;
   placeCount?: number;
-  memberCount?: number;
+  collaborators?: Collaborator[];
 }): Trip {
   const startDate = asIsoDate(row.startDate);
   const endDate = asIsoDate(row.endDate);
-  const memberCount = Math.max(1, Number(row.memberCount ?? 1));
   const placeCount = Math.max(0, Number(row.placeCount ?? 0));
   return {
     id: row.id,
     title: row.title,
     destination: row.destination,
-    country: row.destination,
+    country: countryFromDestination(row.destination),
     dateLabel: formatDateLabel(startDate, endDate),
     startDate,
     endDate,
@@ -51,15 +60,30 @@ function toTrip(row: {
       saved: true,
       addedBy: "",
     })),
-    collaborators: Array.from({ length: memberCount }, (_, index) =>
-      index === 0 ? { initials: "YO", name: "You" } : { initials: "CO", name: "Collaborator" },
-    ),
+    collaborators: row.collaborators ?? [],
   };
 }
 
-export async function listViewerTrips(userId: string): Promise<Trip[]> {
+export function toTripViewer(viewer: { id: string; name?: string | null; image?: string | null }): TripViewer {
+  return { id: viewer.id, name: viewer.name?.trim() || "Traveller", image: viewer.image };
+}
+
+export async function syncMemberProfile(viewer: TripViewer) {
+  const db = getDatabase();
+  if (!db) return;
+  await db
+    .update(tripMembers)
+    .set({
+      displayName: viewer.name.trim() || "Traveller",
+      image: viewer.image || null,
+    })
+    .where(eq(tripMembers.userId, viewer.id));
+}
+
+export async function listViewerTrips(viewer: TripViewer): Promise<Trip[]> {
   const db = getDatabase();
   if (!db) return [];
+  await syncMemberProfile(viewer);
   const rows = await db
     .select({
       id: trips.id,
@@ -68,16 +92,37 @@ export async function listViewerTrips(userId: string): Promise<Trip[]> {
       startDate: trips.startDate,
       endDate: trips.endDate,
       placeCount: sql<number>`(select count(*)::int from ${tripPlaces} where ${tripPlaces.tripId} = ${trips.id})`,
-      memberCount: sql<number>`(select count(*)::int from ${tripMembers} where ${tripMembers.tripId} = ${trips.id})`,
     })
     .from(tripMembers)
     .innerJoin(trips, eq(tripMembers.tripId, trips.id))
-    .where(eq(tripMembers.userId, userId))
+    .where(eq(tripMembers.userId, viewer.id))
     .orderBy(desc(trips.createdAt));
-  return rows.map(toTrip);
+  if (!rows.length) return [];
+  const members = await db
+    .select({
+      tripId: tripMembers.tripId,
+      userId: tripMembers.userId,
+      role: tripMembers.role,
+      displayName: tripMembers.displayName,
+      image: tripMembers.image,
+    })
+    .from(tripMembers)
+    .where(inArray(tripMembers.tripId, rows.map((row) => row.id)));
+  const membersByTrip = new Map<string, typeof members>();
+  for (const member of members) {
+    const list = membersByTrip.get(member.tripId) ?? [];
+    list.push(member);
+    membersByTrip.set(member.tripId, list);
+  }
+  return rows.map((row) =>
+    toTrip({
+      ...row,
+      collaborators: sortPlanners(membersByTrip.get(row.id) ?? []).map((member) => toCollaborator(member, viewer)),
+    }),
+  );
 }
 
-export async function getViewerTrip(tripId: string, userId: string): Promise<Trip | null> {
+export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise<Trip | null> {
   const db = getDatabase();
   if (!db) return null;
   const [row] = await db
@@ -89,11 +134,24 @@ export async function getViewerTrip(tripId: string, userId: string): Promise<Tri
       endDate: trips.endDate,
     })
     .from(trips)
-    .innerJoin(tripMembers, and(eq(tripMembers.tripId, trips.id), eq(tripMembers.userId, userId)))
+    .innerJoin(tripMembers, and(eq(tripMembers.tripId, trips.id), eq(tripMembers.userId, viewer.id)))
     .where(eq(trips.id, tripId))
     .limit(1);
   if (!row) return null;
-  const trip = toTrip(row);
+  await syncMemberProfile(viewer);
+  const members = await db
+    .select({
+      userId: tripMembers.userId,
+      role: tripMembers.role,
+      displayName: tripMembers.displayName,
+      image: tripMembers.image,
+    })
+    .from(tripMembers)
+    .where(eq(tripMembers.tripId, tripId));
+  const trip = toTrip({
+    ...row,
+    collaborators: sortPlanners(members).map((member) => toCollaborator(member, viewer)),
+  });
   const savedPlaces = await db
     .select({
       id: tripPlaces.id,
