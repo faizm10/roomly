@@ -2,9 +2,13 @@
 
 import { LocateFixed, Minus, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import type { CityLocation } from "@/lib/cities";
 import type { Place } from "@/lib/types";
 
+const FALLBACK_CENTER: [number, number] = [-9.1393, 38.7139];
+
 type TripMapProps = {
+  destination: string;
   places: Place[];
   selectedId: string;
   routeActive: boolean;
@@ -12,20 +16,51 @@ type TripMapProps = {
   onSelect: (id: string) => void;
 };
 
-export function TripMap({ places, selectedId, routeActive, mapToken, onSelect }: TripMapProps) {
+async function lookupCityLocation(query: string, signal?: AbortSignal): Promise<CityLocation | null> {
+  const response = await fetch(`/api/cities/geocode?q=${encodeURIComponent(query)}`, { signal });
+  if (!response.ok) return null;
+  const body = (await response.json()) as { coordinates?: [number, number] | null; bbox?: CityLocation["bbox"] };
+  if (!body.coordinates) return null;
+  return { coordinates: body.coordinates, bbox: body.bbox };
+}
+
+function showCity(map: import("mapbox-gl").Map, location: CityLocation, animate: boolean) {
+  if (location.bbox) {
+    map.fitBounds(
+      [
+        [location.bbox[0], location.bbox[1]],
+        [location.bbox[2], location.bbox[3]],
+      ],
+      { padding: 56, maxZoom: 13, duration: animate ? 1400 : 0 },
+    );
+    return;
+  }
+  if (animate) {
+    map.flyTo({ center: location.coordinates, zoom: 12, essential: true, duration: 1400 });
+    return;
+  }
+  map.jumpTo({ center: location.coordinates, zoom: 12 });
+}
+
+export function TripMap({ destination, places, selectedId, routeActive, mapToken, onSelect }: TripMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("mapbox-gl").Map | null>(null);
   const mapboxRef = useRef<typeof import("mapbox-gl").default | null>(null);
   const markersRef = useRef<Map<string, import("mapbox-gl").Marker>>(new Map());
+  const shownDestinationRef = useRef("");
+  const destinationRef = useRef(destination);
+  destinationRef.current = destination;
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (!mapToken || !containerRef.current) return;
     let active = true;
     const markerMap = markersRef.current;
+    const openingDestination = destinationRef.current;
 
     async function mountMap() {
       const mapboxPackage = await import("mapbox-gl");
+      const location = await lookupCityLocation(openingDestination).catch(() => null);
       if (!active || !containerRef.current) return;
       const mapboxgl = mapboxPackage.default;
       mapboxRef.current = mapboxgl;
@@ -33,13 +68,19 @@ export function TripMap({ places, selectedId, routeActive, mapToken, onSelect }:
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: "mapbox://styles/mapbox/light-v11",
-        center: [-9.1393, 38.7139],
-        zoom: 12.5,
+        center: location?.coordinates ?? FALLBACK_CENTER,
+        zoom: 12,
         attributionControl: false,
       });
       mapRef.current = map;
       map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
-      map.on("load", () => setMapReady(true));
+      map.on("load", () => {
+        if (location) {
+          showCity(map, location, false);
+          shownDestinationRef.current = openingDestination;
+        }
+        setMapReady(true);
+      });
     }
 
     mountMap();
@@ -50,8 +91,24 @@ export function TripMap({ places, selectedId, routeActive, mapToken, onSelect }:
       mapRef.current?.remove();
       mapRef.current = null;
       mapboxRef.current = null;
+      shownDestinationRef.current = "";
     };
   }, [mapToken]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map || !destination.trim()) return;
+    if (shownDestinationRef.current === destination) return;
+    const controller = new AbortController();
+    lookupCityLocation(destination, controller.signal)
+      .then((location) => {
+        if (!location || !mapRef.current) return;
+        showCity(mapRef.current, location, true);
+        shownDestinationRef.current = destination;
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [destination, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -138,7 +195,7 @@ export function TripMap({ places, selectedId, routeActive, mapToken, onSelect }:
           {selectedId === place.id && <small>{place.name}</small>}
         </button>
       ))}
-      <div className="map-demo-label">Map preview · Add a Mapbox key for live tiles</div>
+      <div className="map-demo-label">Map preview · {destination || "Add a Mapbox key for live tiles"}</div>
       <div className="map-controls"><button type="button" aria-label="Zoom in"><Plus size={17} /></button><button type="button" aria-label="Zoom out"><Minus size={17} /></button><button type="button" aria-label="Find me"><LocateFixed size={17} /></button></div>
     </div>
   );
