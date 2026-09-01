@@ -1,0 +1,25 @@
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { AuthForm } from "@/components/auth-form";
+import { AuthShell } from "@/components/auth-shell";
+import { getViewer, isNeonAuthConfigured } from "@/lib/auth";
+
+export const metadata: Metadata = { title: "Create account" };
+export const dynamic = "force-dynamic";
+
+export default async function SignUpPage() {
+  const viewer = await getViewer();
+  if (viewer && !viewer.demo) redirect("/trips");
+
+  return (
+    <AuthShell
+      eyebrow="Start here"
+      lede="Save places, invite friends, and keep every trip on one map you can actually use."
+      switchHref="/sign-in"
+      switchLabel="Sign in"
+      title="Start with a shortlist."
+    >
+      <AuthForm authEnabled={isNeonAuthConfigured()} mode="sign-up" />
+    </AuthShell>
+  );
+}
