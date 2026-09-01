@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowRight, CalendarDays, MapPin } from "lucide-react";
+import { ArrowRight, CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createTrip } from "@/app/trips/actions";
+import { CityField } from "@/components/city-field";
 import { createTripSchema } from "@/lib/validators";
 
 export function NewTripForm() {
@@ -14,6 +15,10 @@ export function NewTripForm() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
+    if (!String(data.destination ?? "").trim()) {
+      setError("Pick a city from the list so the trip can be saved.");
+      return;
+    }
     const parsed = createTripSchema.safeParse(data);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Check your trip details.");
@@ -36,12 +41,7 @@ export function NewTripForm() {
         <span>What are you calling it?</span>
         <input name="title" placeholder="Lisbon, loosely" required />
       </label>
-      <label>
-        <span>
-          <MapPin size={15} /> Where are you going?
-        </span>
-        <input name="destination" placeholder="City or region" required />
-      </label>
+      <CityField />
       <div className="date-fields">
         <label>
           <span>
