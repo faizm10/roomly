@@ -8,6 +8,10 @@ export const PLACE_CATEGORIES = [
 ] as const;
 
 export type PlaceCategory = (typeof PLACE_CATEGORIES)[number];
+
+export function categoryClass(category: PlaceCategory | "All") {
+  return `category-${category.toLowerCase()}`;
+}
 export type TravelMode = "walking" | "cycling" | "driving";
 
 export type PlacePhoto = {
