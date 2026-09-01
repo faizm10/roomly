@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import {
@@ -67,6 +67,10 @@ export function AuthForm({
   );
   const isSignUp = mode === "sign-up";
 
+  useEffect(() => {
+    if (state?.ok) window.location.replace("/trips");
+  }, [state]);
+
   return (
     <div className="auth-panel">
       <p className="eyebrow">{isSignUp ? "Create account" : "Sign in"}</p>
@@ -131,8 +135,8 @@ export function AuthForm({
           </p>
         ) : null}
 
-        <button className="button button-ink button-full" disabled={pending} type="submit">
-          {pending
+        <button className="button button-ink button-full" disabled={pending || Boolean(state?.ok)} type="submit">
+          {pending || state?.ok
             ? isSignUp
               ? "Creating account…"
               : "Signing in…"
