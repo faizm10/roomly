@@ -1,21 +1,22 @@
 import Link from "next/link";
-import { ArrowDown, ArrowUpRight, Bookmark, Map, Route, Users } from "lucide-react";
+import { ArrowDown, ArrowUpRight } from "lucide-react";
 import { LandingMap } from "@/components/landing-map";
 import { SiteHeader } from "@/components/site-header";
+import { MapFoldedMark, PostcardMark, WalkingPairMark } from "@/components/travel-marks";
 
 const method = [
   {
-    icon: Bookmark,
+    icon: PostcardMark,
     title: "Save the place, not the post",
     copy: "Turn a link, recommendation, or passing thought into a place you can find again.",
   },
   {
-    icon: Map,
+    icon: MapFoldedMark,
     title: "See the trip take shape",
     copy: "Every save lands on one shared map, with the note that made it worth keeping.",
   },
   {
-    icon: Route,
+    icon: WalkingPairMark,
     title: "Leave with a route",
     copy: "Connect the shortlist, preview the journey, and hand it to your navigation app.",
   },
@@ -33,14 +34,17 @@ export default function Home() {
             Roamboard gathers the places scattered across Instagram, notes, and map lists into one thoughtful trip you can actually use.
           </p>
           <div className="hero-actions">
-            <Link className="button button-ink" href="/trips">
+            <Link className="button button-ink" href="/sign-up">
               Start a trip <ArrowUpRight size={17} />
             </Link>
             <a className="text-action" href="#method">
               See how it works <ArrowDown size={16} />
             </a>
           </div>
-          <div className="hero-note"><Users size={16} /><span>One shared shortlist for everyone going.</span></div>
+          <div className="hero-note">
+            <WalkingPairMark />
+            <span>One shared shortlist for everyone going.</span>
+          </div>
         </div>
         <div className="hero-visual"><LandingMap /></div>
       </section>
@@ -55,7 +59,7 @@ export default function Home() {
           {method.map(({ icon: Icon, title, copy }, index) => (
             <article key={title}>
               <span>{String(index + 1).padStart(2, "0")}</span>
-              <Icon size={21} strokeWidth={1.6} />
+              <Icon />
               <h3>{title}</h3>
               <p>{copy}</p>
             </article>
@@ -79,12 +83,12 @@ export default function Home() {
 
       <section className="cta-section">
         <div><p className="eyebrow">Make the map useful</p><h2>Save less vaguely.<br />Travel more deliberately.</h2></div>
-        <Link className="button button-paper button-large" href="/trips/new">Plan a trip <ArrowUpRight size={18} /></Link>
+        <Link className="button button-paper button-large" href="/sign-up">Plan a trip <ArrowUpRight size={18} /></Link>
       </section>
 
       <footer className="site-footer">
         <div><strong>Roamboard</strong><span>Good places belong together.</span></div>
-        <div><Link href="/sign-in">Sign in</Link><a href="mailto:hello@roamboard.app">Say hello</a></div>
+        <div><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link><a href="mailto:hello@roamboard.app">Say hello</a></div>
         <span>© 2026 Roamboard</span>
       </footer>
     </main>
