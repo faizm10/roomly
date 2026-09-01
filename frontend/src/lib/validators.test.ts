@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { accountNameSchema, addPlaceSchema, createTripSchema, directionsSchema, signInSchema, signUpSchema } from "@/lib/validators";
+import { accountNameSchema, addPlaceSchema, createTripSchema, directionsSchema, signInSchema, signUpSchema, updateTripSchema } from "@/lib/validators";
 
 describe("trip validation", () => {
   it("rejects a trip whose return is before departure", () => {
     const result = createTripSchema.safeParse({ title: "A trip", destination: "Lisbon", startDate: "2026-09-18", endDate: "2026-09-12" });
+    expect(result.success).toBe(false);
+  });
+
+  it("requires a trip id to update logistics", () => {
+    const result = updateTripSchema.safeParse({
+      title: "A trip",
+      destination: "Lisbon, Portugal",
+      startDate: "2026-09-18",
+      endDate: "2026-09-22",
+    });
     expect(result.success).toBe(false);
   });
 
