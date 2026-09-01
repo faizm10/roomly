@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterDemoCities, formatCityLabel } from "@/lib/cities";
+import { demoCityLocation, filterDemoCities, formatCityLabel } from "@/lib/cities";
 
 describe("city labels", () => {
   it("stores a city with its country", () => {
@@ -12,5 +12,9 @@ describe("city labels", () => {
 
   it("filters demo cities as the traveller types", () => {
     expect(filterDemoCities("kyo").map((city) => city.label)).toEqual(["Kyoto, Japan"]);
+  });
+
+  it("finds a demo city location from a stored destination", () => {
+    expect(demoCityLocation("Kyoto")).toEqual({ coordinates: [135.7681, 35.0116] });
   });
 });
