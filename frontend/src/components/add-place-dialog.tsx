@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, MapPin, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { PLACE_CATEGORIES, type Place, type PlaceCategory, type PlaceSearchResult } from "@/lib/types";
+import { PLACE_CATEGORIES, categoryClass, type Place, type PlaceCategory, type PlaceSearchResult } from "@/lib/types";
 
 type AddPlaceDialogProps = {
   destination: string;
@@ -74,7 +74,7 @@ export function AddPlaceDialog({ destination, onAdd, onClose }: AddPlaceDialogPr
                 <button className="search-result" onClick={() => choose(place)} key={place.fsqPlaceId} type="button">
                   <span className="result-pin"><MapPin size={17} /></span>
                   <span><strong>{place.name}</strong><small>{place.address} · {place.neighborhood}</small></span>
-                  <span className="result-category">{place.category}</span>
+                  <span className={`category-tag result-category ${categoryClass(place.category)}`}>{place.category}</span>
                 </button>
               ))}
               {query.length < 2 && <div className="search-empty"><span>PASTE IT.<br />FIND IT.<br />PIN IT.</span></div>}
@@ -85,7 +85,23 @@ export function AddPlaceDialog({ destination, onAdd, onClose }: AddPlaceDialogPr
             <p className="eyebrow">New save</p>
             <h2 id="add-place-title">{selected.name}</h2>
             <p className="selected-address"><MapPin size={15} /> {selected.address}</p>
-            <label className="field-label"><span>Category</span><select value={category} onChange={(event) => setCategory(event.target.value as PlaceCategory)}>{PLACE_CATEGORIES.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <div className="field-label">
+              <span>Category</span>
+              <div className="category-picker" role="radiogroup" aria-label="Category">
+                {PLACE_CATEGORIES.map((item) => (
+                  <button
+                    aria-checked={category === item}
+                    className={`category-tag ${categoryClass(item)}${category === item ? " active" : ""}`}
+                    key={item}
+                    onClick={() => setCategory(item)}
+                    role="radio"
+                    type="button"
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="field-label"><span>Your note</span><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Why did you save this? What should the group know?" rows={4} maxLength={500} /></label>
             <label className="field-label"><span>Where you found it <small>(optional)</small></span><div className="url-input"><ExternalLink size={16} /><input type="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="Instagram, TikTok, article…" /></div></label>
             <button className="button button-ink button-full" onClick={save} type="button">Save to trip <MapPin size={17} /></button>
