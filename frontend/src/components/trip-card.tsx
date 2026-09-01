@@ -8,7 +8,7 @@ export function TripCard({ trip, index }: { trip: Trip; index: number }) {
   return (
     <Link className="trip-card" href={`/trips/${trip.id}`}>
       <div className="trip-cover">
-        {coverPlace ? <PlacePhoto fsqPlaceId={coverPlace.fsqPlaceId} name={coverPlace.name} label={trip.destination} sizes="(max-width: 700px) 100vw, 180px" priority={index === 0} /> : <div className="trip-cover-fallback">{trip.destination.slice(0, 2)}</div>}
+        {coverPlace?.fsqPlaceId ? <PlacePhoto fsqPlaceId={coverPlace.fsqPlaceId} name={coverPlace.name} label={trip.destination} sizes="(max-width: 700px) 100vw, 180px" priority={index === 0} /> : <div className="trip-cover-fallback">{trip.destination.slice(0, 2)}</div>}
         <span className="trip-index">{String(index + 1).padStart(2, "0")}</span>
       </div>
       <div className="trip-card-body">
