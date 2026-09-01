@@ -6,7 +6,7 @@ async function handle(method: "GET" | "POST", request: Request, context: AuthCon
   const auth = getNeonAuth();
   if (!auth) {
     return Response.json(
-      { error: "Neon Auth is not configured. Use the demo sign-in while developing." },
+      { error: "Sign-in is unavailable right now." },
       { status: 503 },
     );
   }
