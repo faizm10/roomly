@@ -6,7 +6,7 @@ import { AppHeader } from "@/components/app-header";
 import { TripCard } from "@/components/trip-card";
 import { getViewer } from "@/lib/auth";
 import { demoTrips } from "@/lib/demo-data";
-import { listViewerTrips } from "@/lib/trips";
+import { listViewerTrips, toTripViewer } from "@/lib/trips";
 
 export const metadata: Metadata = { title: "Your trips" };
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export default async function TripsPage() {
   if (!viewer) redirect("/sign-in");
 
   const firstName = viewer.name?.split(" ")[0] ?? "Traveller";
-  const trips = viewer.demo ? demoTrips : await listViewerTrips(viewer.id);
+  const trips = viewer.demo ? demoTrips : await listViewerTrips(toTripViewer(viewer));
 
   return (
     <main className="app-page">
