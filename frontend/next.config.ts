@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
         hostname: "fastly.4sqi.net",
         pathname: "/img/general/**",
       },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
     ],
   },
 };
