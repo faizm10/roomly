@@ -4,8 +4,10 @@ import {
   BedDouble,
   Bike,
   Bookmark,
+  CalendarDays,
   Check,
   Coffee,
+  FileText,
   ExternalLink,
   Footprints,
   Landmark,
@@ -24,18 +26,31 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addPlace as persistPlace, removePlace as persistRemovePlace, updatePlace as persistUpdatePlace } from "@/app/trips/actions";
+import {
+  addDayNote as persistAddDayNote,
+  addPlace as persistPlace,
+  addTripCity as persistAddTripCity,
+  removeDayNote as persistRemoveDayNote,
+  removePlace as persistRemovePlace,
+  removeTripCity as persistRemoveTripCity,
+  updateDayNote as persistUpdateDayNote,
+  updatePlace as persistUpdatePlace,
+  updatePlacePlanning as persistUpdatePlacePlanning,
+} from "@/app/trips/actions";
 import { AddPlaceDialog } from "@/components/add-place-dialog";
+import { CityField } from "@/components/city-field";
 import { PlacePhoto } from "@/components/place-photo";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { TripLogisticsDialog, type TripDetails } from "@/components/trip-logistics-dialog";
 import { TripMap } from "@/components/trip-map";
+import { countryFromDestination } from "@/lib/dates";
 import { buildAppleMapsUrl, buildGoogleMapsPlaceUrl, buildGoogleMapsUrl } from "@/lib/navigation";
-import { PLACE_CATEGORIES, categoryClass, isPersistedTripId, type Collaborator, type Place, type PlaceCategory, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
+import { PLACE_CATEGORIES, categoryClass, isPersistedTripId, type CityStop, type Collaborator, type DayNote, type Place, type PlaceCategory, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
 
 type RouteStats = { durationSeconds: number; distanceMeters: number };
 type MobileView = "list" | "map";
 type SaveState = "idle" | "saving" | "saved" | "error";
+type WorkspaceMode = "saved" | "day";
 
 function plannersFor(collaborators: Collaborator[], viewer?: TripViewer): Collaborator[] {
   const self = viewer ? { id: viewer.id, name: viewer.name, image: viewer.image } : null;
@@ -53,6 +68,42 @@ const categoryIcons = {
   Other: MapPin,
 } satisfies Record<PlaceCategory, typeof MapPin>;
 
+function isUuid(value?: string | null) {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value));
+}
+
+function addIsoDays(iso: string, days: number) {
+  const date = new Date(`${iso}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function tripDates(startDate: string, endDate: string) {
+  const dates: string[] = [];
+  for (let date = startDate; date <= endDate && dates.length < 45; date = addIsoDays(date, 1)) {
+    dates.push(date);
+  }
+  return dates;
+}
+
+function formatDayHeading(iso: string, index: number) {
+  const date = new Date(`${iso}T00:00:00.000Z`);
+  return {
+    day: `Day ${index + 1}`,
+    date: date.toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" }),
+  };
+}
+
+function parseCityStop(destination: string, trip: TripDetails): Omit<CityStop, "id" | "sortOrder"> {
+  const parts = destination.split(",").map((part) => part.trim()).filter(Boolean);
+  return {
+    name: parts[0] || destination.trim(),
+    country: parts.length > 1 ? parts.at(-1) ?? "" : countryFromDestination(destination),
+    startDate: trip.startDate,
+    endDate: trip.endDate,
+  };
+}
+
 export function TripWorkspace({
   trip,
   mapToken,
@@ -64,6 +115,8 @@ export function TripWorkspace({
 }) {
   const router = useRouter();
   const [places, setPlaces] = useState(trip.places);
+  const [cities, setCities] = useState(trip.cities);
+  const [dayNotes, setDayNotes] = useState(trip.dayNotes);
   const [details, setDetails] = useState<TripDetails>({
     title: trip.title,
     destination: trip.destination,
@@ -73,9 +126,13 @@ export function TripWorkspace({
     endDate: trip.endDate,
   });
   const [selectedId, setSelectedId] = useState(trip.places[0]?.id ?? "");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("saved");
+  const [activeCityId, setActiveCityId] = useState<string>("all");
+  const [activeDate, setActiveDate] = useState<string | null>(null);
   const [filter, setFilter] = useState<PlaceCategory | "All">("All");
   const [mobileView, setMobileView] = useState<MobileView>("list");
   const [addOpen, setAddOpen] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
   const [logisticsOpen, setLogisticsOpen] = useState(false);
   const [routeMode, setRouteMode] = useState<TravelMode | null>(null);
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
@@ -85,7 +142,15 @@ export function TripWorkspace({
   const navDialogRef = useRef<HTMLElement>(null);
   const persistChain = useRef(Promise.resolve());
   const persistedIds = useRef(new Map<string, string>());
+  const localCityCounter = useRef(0);
+  const localNoteCounter = useRef(0);
   const persistable = isPersistedTripId(trip.id);
+  const primaryCity = cities[0];
+  const selectedCity = activeCityId === "all" ? primaryCity : cities.find((city) => city.id === activeCityId) ?? primaryCity;
+  const cityScopedPlaces = useMemo(
+    () => (activeCityId === "all" ? places : places.filter((place) => place.cityId === activeCityId)),
+    [activeCityId, places],
+  );
 
   function enqueuePersist(work: () => Promise<void>) {
     setSaveState("saving");
@@ -96,11 +161,18 @@ export function TripWorkspace({
   }
 
   const planners = useMemo(() => plannersFor(trip.collaborators, viewer), [trip.collaborators, viewer]);
+  const itineraryDates = useMemo(() => tripDates(details.startDate, details.endDate), [details.startDate, details.endDate]);
   const visiblePlaces = useMemo(
-    () => (filter === "All" ? places : places.filter((place) => place.category === filter)),
-    [filter, places],
+    () => (filter === "All" ? cityScopedPlaces : cityScopedPlaces.filter((place) => place.category === filter)),
+    [cityScopedPlaces, filter],
   );
   const selected = places.find((place) => place.id === selectedId);
+  const mapPlaces = useMemo(() => {
+    if (workspaceMode === "day" && activeDate) {
+      return cityScopedPlaces.filter((place) => place.plannedDate === activeDate);
+    }
+    return cityScopedPlaces;
+  }, [activeDate, cityScopedPlaces, workspaceMode]);
 
   const selectPlace = useCallback((id: string) => {
     setSelectedId(id);
@@ -110,21 +182,21 @@ export function TripWorkspace({
   }, []);
 
   useEffect(() => {
-    if (!routeMode || places.length < 2) {
+    if (!routeMode || mapPlaces.length < 2) {
       return;
     }
     const controller = new AbortController();
     fetch("/api/routes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coordinates: places.map((place) => place.coordinates), mode: routeMode }),
+      body: JSON.stringify({ coordinates: mapPlaces.map((place) => place.coordinates), mode: routeMode }),
       signal: controller.signal,
     })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Route unavailable")))
       .then((body: RouteStats) => setRouteStats(body))
       .catch(() => setRouteStats(null));
     return () => controller.abort();
-  }, [places, routeMode]);
+  }, [mapPlaces, routeMode]);
 
   useEffect(() => {
     if (saveState !== "saving") return;
@@ -144,7 +216,8 @@ export function TripWorkspace({
   }, [navOpen]);
 
   function addPlace(place: Place) {
-    const next = { ...place, addedBy: viewer?.name || place.addedBy, saved: true };
+    const cityId = selectedCity?.id ?? null;
+    const next = { ...place, cityId, addedBy: viewer?.name || place.addedBy, saved: true };
     setPlaces((current) => [...current, next]);
     setSelectedId(next.id);
     setFilter("All");
@@ -154,6 +227,7 @@ export function TripWorkspace({
       try {
         const saved = await persistPlace({
           tripId: trip.id,
+          cityId: isUuid(cityId) ? cityId : "",
           fsqPlaceId: next.fsqPlaceId,
           name: next.name,
           address: next.address,
@@ -171,6 +245,38 @@ export function TripWorkspace({
         setSelectedId((current) => (current === next.id ? saved.id : current));
       } catch (error) {
         setPlaces((current) => current.filter((item) => item.id !== next.id));
+        throw error;
+      }
+    });
+  }
+
+  function updatePlanning(id: string, plannedDate: string, cityId: string) {
+    const previous = places.find((item) => item.id === id);
+    if (!previous) return;
+    const nextDate = plannedDate || null;
+    const nextCityId = nextDate ? cityId || selectedCity?.id || null : null;
+    const daySortOrder = nextDate ? places.filter((place) => place.plannedDate === nextDate && place.id !== id).length : 0;
+    setPlaces((current) =>
+      current.map((item) =>
+        item.id === id
+          ? { ...item, cityId: nextCityId, plannedDate: nextDate, daySortOrder }
+          : item,
+      ),
+    );
+    if (!persistable) return;
+    enqueuePersist(async () => {
+      try {
+        const placeId = persistedIds.current.get(id) ?? id;
+        if (placeId.startsWith("local-")) return;
+        await persistUpdatePlacePlanning({
+          tripId: trip.id,
+          placeId,
+          cityId: isUuid(nextCityId) ? nextCityId : "",
+          plannedDate: nextDate ?? "",
+          daySortOrder,
+        });
+      } catch (error) {
+        setPlaces((current) => current.map((item) => (item.id === id ? previous : item)));
         throw error;
       }
     });
@@ -213,6 +319,123 @@ export function TripWorkspace({
     });
   }
 
+  function addCity(city: Omit<CityStop, "id" | "sortOrder">) {
+    localCityCounter.current += 1;
+    const localId = `local-city-${localCityCounter.current}`;
+    const next = { ...city, id: localId, sortOrder: cities.length };
+    setCities((current) => [...current, next]);
+    setActiveCityId(localId);
+    if (!persistable) return;
+    enqueuePersist(async () => {
+      try {
+        const saved = await persistAddTripCity({
+          tripId: trip.id,
+          name: next.name,
+          country: next.country,
+          startDate: next.startDate ?? "",
+          endDate: next.endDate ?? "",
+        });
+        if (!("id" in saved) || !saved.id) return;
+        setCities((current) => current.map((cityItem) => (cityItem.id === localId ? { ...cityItem, id: saved.id } : cityItem)));
+        setPlaces((current) => current.map((place) => (place.cityId === localId ? { ...place, cityId: saved.id } : place)));
+        setDayNotes((current) => current.map((note) => (note.cityId === localId ? { ...note, cityId: saved.id } : note)));
+        setActiveCityId((current) => (current === localId ? saved.id : current));
+      } catch (error) {
+        setCities((current) => current.filter((cityItem) => cityItem.id !== localId));
+        setActiveCityId("all");
+        throw error;
+      }
+    });
+  }
+
+  function removeCity(cityId: string) {
+    const removed = cities.find((city) => city.id === cityId);
+    if (!removed || cities.length <= 1) return;
+    const previousPlaces = places;
+    const previousNotes = dayNotes;
+    setCities((current) => current.filter((city) => city.id !== cityId));
+    setPlaces((current) => current.map((place) => (place.cityId === cityId ? { ...place, cityId: null, plannedDate: null, daySortOrder: 0 } : place)));
+    setDayNotes((current) => current.map((note) => (note.cityId === cityId ? { ...note, cityId: null } : note)));
+    setActiveCityId("all");
+    if (!persistable || !isUuid(cityId)) return;
+    enqueuePersist(async () => {
+      try {
+        await persistRemoveTripCity({ tripId: trip.id, cityId });
+      } catch (error) {
+        setCities((current) => [...current, removed].sort((left, right) => left.sortOrder - right.sortOrder));
+        setPlaces(previousPlaces);
+        setDayNotes(previousNotes);
+        throw error;
+      }
+    });
+  }
+
+  function addNote(plannedDate: string, note: string, cityId: string) {
+    localNoteCounter.current += 1;
+    const localId = `local-note-${localNoteCounter.current}`;
+    const next: DayNote = {
+      id: localId,
+      cityId: cityId === "all" ? null : cityId,
+      plannedDate,
+      note,
+      sortOrder: dayNotes.filter((item) => item.plannedDate === plannedDate).length,
+      addedBy: viewer?.name || "Traveller",
+    };
+    setDayNotes((current) => [...current, next]);
+    if (!persistable) return;
+    enqueuePersist(async () => {
+      try {
+        const saved = await persistAddDayNote({
+          tripId: trip.id,
+          cityId: isUuid(next.cityId) ? next.cityId : "",
+          plannedDate,
+          note,
+        });
+        if (!("id" in saved) || !saved.id) return;
+        setDayNotes((current) => current.map((item) => (item.id === localId ? { ...item, id: saved.id } : item)));
+      } catch (error) {
+        setDayNotes((current) => current.filter((item) => item.id !== localId));
+        throw error;
+      }
+    });
+  }
+
+  function updateNote(noteId: string, note: string) {
+    const previous = dayNotes.find((item) => item.id === noteId);
+    if (!previous) return;
+    const next = { ...previous, note };
+    setDayNotes((current) => current.map((item) => (item.id === noteId ? next : item)));
+    if (!persistable || noteId.startsWith("local-")) return;
+    enqueuePersist(async () => {
+      try {
+        await persistUpdateDayNote({
+          tripId: trip.id,
+          noteId,
+          cityId: isUuid(next.cityId) ? next.cityId : "",
+          plannedDate: next.plannedDate,
+          note: next.note,
+        });
+      } catch (error) {
+        setDayNotes((current) => current.map((item) => (item.id === noteId ? previous : item)));
+        throw error;
+      }
+    });
+  }
+
+  function removeNote(noteId: string) {
+    const previous = dayNotes.find((item) => item.id === noteId);
+    setDayNotes((current) => current.filter((item) => item.id !== noteId));
+    if (!persistable || noteId.startsWith("local-")) return;
+    enqueuePersist(async () => {
+      try {
+        await persistRemoveDayNote({ tripId: trip.id, noteId });
+      } catch (error) {
+        if (previous) setDayNotes((current) => [...current, previous]);
+        throw error;
+      }
+    });
+  }
+
   async function share() {
     const inviteUrl = `${window.location.origin}/invite/demo-lisbon-board`;
     await navigator.clipboard?.writeText(inviteUrl);
@@ -220,7 +443,7 @@ export function TripWorkspace({
     window.setTimeout(() => setCopied(false), 1800);
   }
 
-  const activeRouteStats = routeMode && places.length >= 2 ? routeStats : null;
+  const activeRouteStats = routeMode && mapPlaces.length >= 2 ? routeStats : null;
   const minutes = activeRouteStats ? Math.max(1, Math.round(activeRouteStats.durationSeconds / 60)) : null;
   const kilometers = activeRouteStats ? (activeRouteStats.distanceMeters / 1000).toFixed(1) : null;
 
@@ -236,9 +459,24 @@ export function TripWorkspace({
           <div className="trip-title-row">
             <div><p className="eyebrow">{details.destination} · {details.dateLabel}</p><h1>{details.title}</h1></div>
             <div className="trip-header-actions">
+              <button className="icon-button trip-options" aria-label="Add a city" onClick={() => setCityOpen(true)} type="button"><MapPin size={19} /></button>
               <button className="icon-button trip-options" aria-label="Add a place" onClick={() => setAddOpen(true)} type="button"><Plus size={19} /></button>
               <button className="icon-button trip-options" aria-label="Change where, when, and what" onClick={() => setLogisticsOpen(true)} type="button"><MoreHorizontal size={19} /></button>
             </div>
+          </div>
+          <div className="workspace-mode" role="tablist" aria-label="Planning mode">
+            <button role="tab" aria-selected={workspaceMode === "saved"} className={workspaceMode === "saved" ? "active" : ""} onClick={() => { setWorkspaceMode("saved"); setActiveDate(null); }} type="button"><Bookmark size={14} /> Saved places</button>
+            <button role="tab" aria-selected={workspaceMode === "day"} className={workspaceMode === "day" ? "active" : ""} onClick={() => setWorkspaceMode("day")} type="button"><CalendarDays size={14} /> Day plan</button>
+          </div>
+          <div className="city-strip" aria-label="City stops">
+            <button className={activeCityId === "all" ? "active" : ""} onClick={() => setActiveCityId("all")} type="button">All cities</button>
+            {cities.map((city) => (
+              <span className={`city-chip${activeCityId === city.id ? " active" : ""}`} key={city.id}>
+                <button onClick={() => setActiveCityId(city.id)} type="button">{city.name}</button>
+                {cities.length > 1 ? <button aria-label={`Remove ${city.name}`} onClick={() => removeCity(city.id)} type="button"><X size={12} /></button> : null}
+              </span>
+            ))}
+            <button className="city-add" onClick={() => setCityOpen(true)} type="button"><Plus size={13} /> City</button>
           </div>
           <div className="collab-row">
             <div className="mini-avatars">
@@ -264,7 +502,7 @@ export function TripWorkspace({
         </div>
 
         <div className="place-list">
-          {visiblePlaces.map((place) => {
+          {workspaceMode === "saved" ? visiblePlaces.map((place) => {
             const originalIndex = places.findIndex((item) => item.id === place.id);
             const number = String(originalIndex + 1).padStart(2, "0");
             return (
@@ -301,6 +539,7 @@ export function TripWorkspace({
                     </a>
                   </small>
                   <p className="place-note">{place.note || "No note yet. Add the detail that made this place worth saving."}</p>
+                  <PlanningControls cities={cities} dates={itineraryDates} onChange={updatePlanning} place={place} />
                   <div className="place-actions">
                     <span className="contributor">Added by {place.addedBy}</span>
                     {place.sourceUrl ? <a href={place.sourceUrl} onClick={(event) => event.stopPropagation()} target="_blank" rel="noreferrer">Original source <ExternalLink size={13} /></a> : null}
@@ -312,21 +551,37 @@ export function TripWorkspace({
                 </div>
               </article>
             );
-          })}
-          {!visiblePlaces.length ? <div className="empty-filter"><p>No {filter.toLowerCase()} places yet.</p><button onClick={() => setAddOpen(true)} type="button">Add the first one <Plus size={15} /></button></div> : null}
-          <button className="add-place-row" onClick={() => setAddOpen(true)} type="button"><span><Plus size={18} /></span><div><strong>Add another place</strong><small>Search {details.destination}</small></div></button>
+          }) : (
+            <DayPlan
+              activeCityId={activeCityId}
+              activeDate={activeDate}
+              cities={cities}
+              dates={itineraryDates}
+              dayNotes={dayNotes}
+              onAddNote={addNote}
+              onFocusDate={setActiveDate}
+              onRemoveNote={removeNote}
+              onSelectPlace={selectPlace}
+              onUpdateNote={updateNote}
+              onUpdatePlanning={updatePlanning}
+              places={places}
+              selectedId={selectedId}
+            />
+          )}
+          {workspaceMode === "saved" && !visiblePlaces.length ? <div className="empty-filter"><p>No {filter.toLowerCase()} places yet.</p><button onClick={() => setAddOpen(true)} type="button">Add the first one <Plus size={15} /></button></div> : null}
+          {workspaceMode === "saved" ? <button className="add-place-row" onClick={() => setAddOpen(true)} type="button"><span><Plus size={18} /></span><div><strong>Add another place</strong><small>Search {selectedCity?.name ?? details.destination}</small></div></button> : null}
         </div>
       </aside>
 
       <section className="map-panel">
-        <TripMap destination={details.destination} places={places} selectedId={selectedId} onSelect={selectPlace} routeActive={Boolean(routeMode)} mapToken={mapToken} />
+        <TripMap destination={selectedCity?.name ?? details.destination} places={mapPlaces} selectedId={selectedId} onSelect={selectPlace} routeActive={Boolean(routeMode)} mapToken={mapToken} />
         <div className="map-topbar">
           <button className={`route-button${routeMode ? " active" : ""}`} onClick={() => setRouteMode((current) => current ?? "walking")} type="button"><Route size={16} /> {routeMode ? "Route active" : "Plan a route"}</button>
         </div>
         {selected ? <button className="mobile-place-peek" onClick={() => setMobileView("list")} type="button"><span>{String(places.findIndex((place) => place.id === selected.id) + 1).padStart(2, "0")}</span><strong>{selected.name}</strong><small>{selected.neighborhood} · View details</small></button> : null}
         {routeMode ? (
           <div className="route-dock">
-            <header><div><p className="eyebrow">Route preview</p><strong>{places.length} stops · {kilometers ?? "…"} km</strong></div><button className="icon-button" onClick={() => setRouteMode(null)} aria-label="Close route preview" type="button"><X size={18} /></button></header>
+            <header><div><p className="eyebrow">Route preview</p><strong>{mapPlaces.length} stops · {kilometers ?? "…"} km</strong></div><button className="icon-button" onClick={() => setRouteMode(null)} aria-label="Close route preview" type="button"><X size={18} /></button></header>
             <div className="mode-picker">
               {(["walking", "cycling", "driving"] as TravelMode[]).map((mode) => (
                 <button className={routeMode === mode ? "active" : ""} onClick={() => setRouteMode(mode)} key={mode} type="button">
@@ -340,7 +595,8 @@ export function TripWorkspace({
       </section>
 
       <button className="mobile-add-button" onClick={() => setAddOpen(true)} aria-label="Add a place" type="button"><Plus size={22} /></button>
-      {addOpen ? <AddPlaceDialog destination={details.destination} onAdd={addPlace} onClose={() => setAddOpen(false)} /> : null}
+      {addOpen ? <AddPlaceDialog destination={selectedCity?.name ?? details.destination} onAdd={addPlace} onClose={() => setAddOpen(false)} /> : null}
+      {cityOpen ? <AddCityDialog details={details} onAdd={addCity} onClose={() => setCityOpen(false)} /> : null}
       {logisticsOpen ? (
         <TripLogisticsDialog
           onClose={() => setLogisticsOpen(false)}
@@ -357,11 +613,275 @@ export function TripWorkspace({
             <button className="icon-button nav-close" onClick={() => setNavOpen(false)} aria-label="Close" type="button"><X size={19} /></button>
             <span className="nav-compass"><Navigation size={27} /></span>
             <p className="eyebrow">Hand off the route</p><h2 id="nav-title">Ready to go?</h2><p>Open the route in the navigation app you use on the road.</p>
-            <a className="button button-ink button-full" href={buildGoogleMapsUrl(places, routeMode ?? "walking")} target="_blank" rel="noreferrer">Open Google Maps <ExternalLink size={16} /></a>
-            <a className="button button-ghost button-full" href={buildAppleMapsUrl(places, routeMode ?? "walking")} target="_blank" rel="noreferrer">Open Apple Maps <ExternalLink size={16} /></a>
+            <a className="button button-ink button-full" href={buildGoogleMapsUrl(mapPlaces, routeMode ?? "walking")} target="_blank" rel="noreferrer">Open Google Maps <ExternalLink size={16} /></a>
+            <a className="button button-ghost button-full" href={buildAppleMapsUrl(mapPlaces, routeMode ?? "walking")} target="_blank" rel="noreferrer">Open Apple Maps <ExternalLink size={16} /></a>
           </section>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function PlanningControls({
+  cities,
+  dates,
+  onChange,
+  place,
+}: {
+  cities: CityStop[];
+  dates: string[];
+  onChange: (placeId: string, plannedDate: string, cityId: string) => void;
+  place: Place;
+}) {
+  const dateValue = place.plannedDate ?? "";
+  const cityValue = place.cityId ?? cities[0]?.id ?? "";
+  return (
+    <div className="planning-controls" onClick={(event) => event.stopPropagation()}>
+      <label>
+        <span>Day</span>
+        <select value={dateValue} onChange={(event) => onChange(place.id, event.target.value, cityValue)} aria-label={`Plan day for ${place.name}`}>
+          <option value="">Unscheduled</option>
+          {dates.map((date, index) => {
+            const label = formatDayHeading(date, index);
+            return <option value={date} key={date}>{label.day} · {label.date}</option>;
+          })}
+        </select>
+      </label>
+      <label>
+        <span>City</span>
+        <select value={cityValue} onChange={(event) => onChange(place.id, dateValue || dates[0] || "", event.target.value)} aria-label={`Plan city for ${place.name}`}>
+          {cities.map((city) => <option value={city.id} key={city.id}>{city.name}</option>)}
+        </select>
+      </label>
+      {dateValue ? <button onClick={() => onChange(place.id, "", "")} type="button">Remove from day</button> : null}
+    </div>
+  );
+}
+
+function DayPlan({
+  activeCityId,
+  activeDate,
+  cities,
+  dates,
+  dayNotes,
+  onAddNote,
+  onFocusDate,
+  onRemoveNote,
+  onSelectPlace,
+  onUpdateNote,
+  onUpdatePlanning,
+  places,
+  selectedId,
+}: {
+  activeCityId: string;
+  activeDate: string | null;
+  cities: CityStop[];
+  dates: string[];
+  dayNotes: DayNote[];
+  onAddNote: (plannedDate: string, note: string, cityId: string) => void;
+  onFocusDate: (plannedDate: string | null) => void;
+  onRemoveNote: (noteId: string) => void;
+  onSelectPlace: (placeId: string) => void;
+  onUpdateNote: (noteId: string, note: string) => void;
+  onUpdatePlanning: (placeId: string, plannedDate: string, cityId: string) => void;
+  places: Place[];
+  selectedId: string;
+}) {
+  const cityMatches = (cityId?: string | null) => activeCityId === "all" || cityId === activeCityId;
+  const unplannedPlaces = places.filter((place) => !place.plannedDate && cityMatches(place.cityId));
+
+  return (
+    <div className="day-plan">
+      <div className="day-plan-intro">
+        <p className="eyebrow">Day plan</p>
+        <button className={!activeDate ? "active" : ""} onClick={() => onFocusDate(null)} type="button">Map all days</button>
+      </div>
+      {dates.map((date, index) => {
+        const label = formatDayHeading(date, index);
+        const notes = dayNotes
+          .filter((note) => note.plannedDate === date && cityMatches(note.cityId))
+          .sort((left, right) => left.sortOrder - right.sortOrder);
+        const dayPlaces = places
+          .filter((place) => place.plannedDate === date && cityMatches(place.cityId))
+          .sort((left, right) => (left.daySortOrder ?? 0) - (right.daySortOrder ?? 0));
+        return (
+          <section className={`day-section${activeDate === date ? " active" : ""}`} key={date}>
+            <header>
+              <div>
+                <span>{label.day}</span>
+                <h2>{label.date}</h2>
+              </div>
+              <button onClick={() => onFocusDate(activeDate === date ? null : date)} type="button">{activeDate === date ? "Showing" : "Map this day"}</button>
+            </header>
+            <div className="day-notes">
+              {notes.map((note) => (
+                <DayNoteRow key={note.id} note={note} onRemove={onRemoveNote} onUpdate={onUpdateNote} />
+              ))}
+              <NoteComposer activeCityId={activeCityId} cities={cities} onAdd={(note, cityId) => onAddNote(date, note, cityId)} />
+            </div>
+            <div className="day-place-list">
+              {dayPlaces.map((place) => (
+                <article className={`day-place${selectedId === place.id ? " selected" : ""}`} key={place.id}>
+                  <button onClick={() => onSelectPlace(place.id)} type="button">
+                    <strong>{place.name}</strong>
+                    <small>{place.neighborhood || place.address}</small>
+                  </button>
+                  <PlanningControls cities={cities} dates={dates} onChange={onUpdatePlanning} place={place} />
+                </article>
+              ))}
+              {!dayPlaces.length ? <p className="day-empty">No places planned for this day yet.</p> : null}
+            </div>
+          </section>
+        );
+      })}
+      {unplannedPlaces.length ? (
+        <section className="day-section unplanned-section">
+          <header><div><span>Unscheduled</span><h2>Saved for later</h2></div></header>
+          {unplannedPlaces.map((place) => (
+            <article className="day-place" key={place.id}>
+              <button onClick={() => onSelectPlace(place.id)} type="button">
+                <strong>{place.name}</strong>
+                <small>{place.neighborhood || place.address}</small>
+              </button>
+              <PlanningControls cities={cities} dates={dates} onChange={onUpdatePlanning} place={place} />
+            </article>
+          ))}
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function NoteComposer({
+  activeCityId,
+  cities,
+  onAdd,
+}: {
+  activeCityId: string;
+  cities: CityStop[];
+  onAdd: (note: string, cityId: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  const [cityId, setCityId] = useState("");
+  const selectedCityId = activeCityId === "all" ? cityId || cities[0]?.id || "" : activeCityId;
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = note.trim();
+    if (!trimmed) return;
+    onAdd(trimmed, selectedCityId);
+    setNote("");
+  }
+
+  return (
+    <form className="note-composer" onSubmit={submit}>
+      <FileText size={14} />
+      <input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add a note for this day" maxLength={500} />
+      {activeCityId === "all" && cities.length > 1 ? (
+        <select value={selectedCityId} onChange={(event) => setCityId(event.target.value)} aria-label="Note city">
+          {cities.map((city) => <option value={city.id} key={city.id}>{city.name}</option>)}
+        </select>
+      ) : null}
+      <button type="submit">Add</button>
+    </form>
+  );
+}
+
+function DayNoteRow({
+  note,
+  onRemove,
+  onUpdate,
+}: {
+  note: DayNote;
+  onRemove: (noteId: string) => void;
+  onUpdate: (noteId: string, note: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(note.note);
+
+  function save() {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    onUpdate(note.id, trimmed);
+    setEditing(false);
+  }
+
+  return (
+    <div className="day-note">
+      {editing ? (
+        <>
+          <textarea value={value} onChange={(event) => setValue(event.target.value)} maxLength={500} rows={2} />
+          <button onClick={save} type="button">Save</button>
+        </>
+      ) : (
+        <>
+          <p>{note.note}</p>
+          <button onClick={() => setEditing(true)} type="button">Edit</button>
+        </>
+      )}
+      <button aria-label="Delete note" onClick={() => onRemove(note.id)} type="button"><Trash2 size={13} /></button>
+    </div>
+  );
+}
+
+function AddCityDialog({
+  details,
+  onAdd,
+  onClose,
+}: {
+  details: TripDetails;
+  onAdd: (city: Omit<CityStop, "id" | "sortOrder">) => void;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const destination = String(data.destination ?? "").trim();
+    if (!destination) {
+      setError("Pick a city from the list.");
+      return;
+    }
+    const startDate = String(data.startDate ?? "") || details.startDate;
+    const endDate = String(data.endDate ?? "") || details.endDate;
+    if (endDate < startDate) {
+      setError("The city end date must be after its start date.");
+      return;
+    }
+    onAdd({ ...parseCityStop(destination, details), startDate, endDate });
+    onClose();
+  }
+
+  return (
+    <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="place-dialog logistics-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="city-title" tabIndex={-1}>
+        <header>
+          <span className="dialog-step">City stop</span>
+          <button className="icon-button" onClick={onClose} aria-label="Close" type="button"><X size={20} /></button>
+        </header>
+        <p className="eyebrow">Add another city</p>
+        <h2 id="city-title">Where else?</h2>
+        <form className="new-trip-form" onSubmit={submit}>
+          <CityField />
+          <div className="date-fields">
+            <label><span>Arrive</span><input defaultValue={details.startDate} name="startDate" type="date" /></label>
+            <label><span>Leave</span><input defaultValue={details.endDate} name="endDate" type="date" /></label>
+          </div>
+          {error ? <p className="form-error" role="alert">{error}</p> : null}
+          <button className="button button-ink button-full" type="submit">Add city <MapPin size={17} /></button>
+        </form>
+      </section>
     </div>
   );
 }

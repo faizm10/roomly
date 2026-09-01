@@ -416,6 +416,20 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .places-panel-header { position: relative; z-index: 5; flex: none; padding: 38px 48px 0; border-bottom: 1px solid var(--line); background: var(--paper); }
 .trip-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .trip-title-row h1 { margin: 8px 0 0; font-family: var(--font-handwritten), cursive; font-size: clamp(42px, 4vw, 60px); font-weight: 700; line-height: .95; }
+.workspace-mode { display: grid; width: min(100%, 390px); margin-top: 22px; grid-template-columns: 1fr 1fr; border: 1px solid var(--ink); background: var(--paper); }
+.workspace-mode button { display: inline-flex; min-height: 36px; padding: 0 12px; align-items: center; justify-content: center; gap: 7px; border: 0; border-right: 1px solid var(--ink); background: transparent; color: var(--muted); font-size: 11px; font-weight: 650; cursor: pointer; }
+.workspace-mode button:last-child { border-right: 0; }
+.workspace-mode button.active { background: var(--ink); color: var(--paper); }
+.city-strip { display: flex; margin-top: 14px; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.city-strip::-webkit-scrollbar { display: none; }
+.city-strip > button, .city-chip { flex: none; }
+.city-strip > button, .city-chip button { min-height: 30px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 10px; font-weight: 650; cursor: pointer; }
+.city-strip > button { display: inline-flex; padding: 0 10px; align-items: center; gap: 5px; }
+.city-strip > button.active, .city-chip.active button:first-child { border-color: var(--ink); background: var(--paper); color: var(--ink); }
+.city-chip { display: inline-flex; align-items: center; }
+.city-chip button:first-child { padding: 0 10px; border-right: 0; }
+.city-chip button:last-child { display: grid; width: 28px; padding: 0; place-items: center; }
+.city-add { border-style: dashed !important; }
 .collab-row { display: flex; margin-top: 24px; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; }
 .mini-avatars { display: flex; align-items: center; }
 .mini-avatar { display: grid; width: 30px; height: 30px; margin-left: -6px; place-items: center; overflow: hidden; border: 1px solid var(--ink); border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 8px; font-weight: 700; }
@@ -484,6 +498,11 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .place-address a { flex: none; font-size: 13px; line-height: 1; opacity: .7; text-decoration: none; }
 .place-address a:hover { opacity: 1; }
 .place-note { margin: 19px 0 16px; color: #3f3f3f; font-size: 13px; line-height: 1.55; }
+.planning-controls { display: flex; flex-wrap: wrap; margin: 0 0 15px; align-items: end; gap: 8px; }
+.planning-controls label { display: grid; gap: 5px; }
+.planning-controls label span { color: var(--muted); font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.planning-controls select { min-height: 32px; max-width: 155px; padding: 0 28px 0 9px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-size: 10px; }
+.planning-controls button { min-height: 32px; padding: 0 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
 .place-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .contributor { color: var(--muted); font-size: 9px; text-transform: uppercase; }
 .place-actions a { display: inline-flex; min-height: 28px; padding: 0 10px; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; font-size: 9px; font-weight: 600; }
@@ -499,6 +518,31 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .add-place-row strong, .add-place-row small { display: block; }
 .add-place-row strong { font-size: 13px; }
 .add-place-row small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.day-plan { padding-bottom: 24px; }
+.day-plan-intro { display: flex; min-height: 58px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.day-plan-intro button, .day-section header button { min-height: 30px; padding: 0 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 10px; font-weight: 650; cursor: pointer; }
+.day-plan-intro button.active, .day-section.active header button { border-color: var(--ink); color: var(--ink); }
+.day-section { padding: 24px 0 18px; border-bottom: 1px solid var(--line); }
+.day-section > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.day-section > header span { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.day-section > header h2 { margin: 5px 0 0; font-size: 25px; font-weight: 650; letter-spacing: -.04em; }
+.day-notes { margin-top: 16px; }
+.day-note, .note-composer { display: grid; align-items: center; gap: 9px; border: 1px solid var(--line); background: var(--surface); }
+.day-note { min-height: 44px; margin-bottom: 8px; padding: 8px 9px 8px 12px; grid-template-columns: 1fr auto auto; }
+.day-note p { margin: 0; color: #3f3f3f; font-size: 12px; line-height: 1.4; }
+.day-note textarea { min-height: 52px; padding: 8px; border: 1px solid var(--line); background: var(--paper); font-size: 12px; resize: vertical; }
+.day-note button, .note-composer button { border: 0; background: transparent; color: var(--muted); font-size: 10px; font-weight: 650; cursor: pointer; }
+.note-composer { min-height: 42px; padding: 0 9px 0 12px; grid-template-columns: auto 1fr auto auto; }
+.note-composer input, .note-composer select { min-height: 38px; border: 0; background: transparent; font-size: 12px; outline: none; }
+.note-composer select { color: var(--muted); font-size: 10px; }
+.day-place-list { margin-top: 14px; }
+.day-place { display: grid; padding: 12px 0; grid-template-columns: 1fr; gap: 10px; border-bottom: 1px dashed var(--line); }
+.day-place > button { display: grid; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.day-place > button strong { font-size: 14px; }
+.day-place > button small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.day-place.selected > button strong { text-decoration: underline; text-underline-offset: 4px; }
+.day-empty { margin: 16px 0 0; color: var(--muted); font-size: 12px; }
+.unplanned-section { background: linear-gradient(90deg, transparent, var(--surface), transparent); }
 .map-panel { position: relative; min-width: 0; grid-area: map; overflow: hidden; background: var(--map-land); }
 .real-map-wrap, .real-map, .demo-map { position: absolute; inset: 0; }
 .mapboxgl-map { font-family: var(--font-body), sans-serif; }

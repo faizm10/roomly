@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { countryFromDestination, formatDateLabel } from "@/lib/dates";
 import { getDatabase } from "@/lib/db";
-import { tripMembers, tripPlaces, trips } from "@/lib/db/schema";
-import type { Collaborator, PlaceCategory, Trip, TripViewer } from "@/lib/types";
+import { tripCities, tripDayNotes, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
+import type { CityStop, Collaborator, DayNote, PlaceCategory, Trip, TripViewer } from "@/lib/types";
 
 function asIsoDate(value: string | Date) {
   if (typeof value === "string") return value.slice(0, 10);
@@ -28,6 +28,50 @@ function sortPlanners<T extends { role: "owner" | "editor"; joinedAt?: Date | st
   });
 }
 
+function destinationParts(destination: string) {
+  const parts = destination.split(",").map((part) => part.trim()).filter(Boolean);
+  return {
+    name: parts[0] || destination,
+    country: parts.length > 1 ? parts.at(-1) ?? "" : countryFromDestination(destination),
+  };
+}
+
+function toCityStop(row: {
+  id: string;
+  name: string;
+  country: string;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
+  sortOrder: number;
+}): CityStop {
+  return {
+    id: row.id,
+    name: row.name,
+    country: row.country,
+    startDate: row.startDate ? asIsoDate(row.startDate) : null,
+    endDate: row.endDate ? asIsoDate(row.endDate) : null,
+    sortOrder: row.sortOrder,
+  };
+}
+
+function fallbackCity(row: { id: string; destination: string; startDate: string | Date; endDate: string | Date }): CityStop {
+  const destination = destinationParts(row.destination);
+  return {
+    id: `${row.id}-primary-city`,
+    name: destination.name,
+    country: destination.country,
+    startDate: asIsoDate(row.startDate),
+    endDate: asIsoDate(row.endDate),
+    sortOrder: 0,
+  };
+}
+
+function formatCitySummary(cities: CityStop[], fallback: string) {
+  if (!cities.length) return fallback;
+  if (cities.length === 1) return cities[0].name;
+  return `${cities[0].name} + ${cities.length - 1} ${cities.length === 2 ? "city" : "cities"}`;
+}
+
 function toTrip(row: {
   id: string;
   title: string;
@@ -35,22 +79,28 @@ function toTrip(row: {
   startDate: string | Date;
   endDate: string | Date;
   placeCount?: number;
+  cities?: CityStop[];
+  dayNotes?: DayNote[];
   collaborators?: Collaborator[];
 }): Trip {
   const startDate = asIsoDate(row.startDate);
   const endDate = asIsoDate(row.endDate);
   const placeCount = Math.max(0, Number(row.placeCount ?? 0));
+  const cities = row.cities?.length ? row.cities : [fallbackCity(row)];
   return {
     id: row.id,
     title: row.title,
-    destination: row.destination,
-    country: countryFromDestination(row.destination),
+    destination: formatCitySummary(cities, row.destination),
+    country: cities[0]?.country || countryFromDestination(row.destination),
     dateLabel: formatDateLabel(startDate, endDate),
     startDate,
     endDate,
+    cities,
+    dayNotes: row.dayNotes ?? [],
     places: Array.from({ length: placeCount }, (_, index) => ({
       id: `${row.id}-place-${index}`,
       fsqPlaceId: "",
+      cityId: null,
       name: "Saved place",
       address: "",
       neighborhood: "",
@@ -58,6 +108,8 @@ function toTrip(row: {
       note: "",
       coordinates: [0, 0] as [number, number],
       saved: true,
+      plannedDate: null,
+      daySortOrder: 0,
       addedBy: "",
     })),
     collaborators: row.collaborators ?? [],
@@ -98,6 +150,7 @@ export async function listViewerTrips(viewer: TripViewer): Promise<Trip[]> {
     .where(eq(tripMembers.userId, viewer.id))
     .orderBy(desc(trips.createdAt));
   if (!rows.length) return [];
+  const tripIds = rows.map((row) => row.id);
   const members = await db
     .select({
       tripId: tripMembers.tripId,
@@ -107,16 +160,36 @@ export async function listViewerTrips(viewer: TripViewer): Promise<Trip[]> {
       image: tripMembers.image,
     })
     .from(tripMembers)
-    .where(inArray(tripMembers.tripId, rows.map((row) => row.id)));
+    .where(inArray(tripMembers.tripId, tripIds));
+  const cities = await db
+    .select({
+      id: tripCities.id,
+      tripId: tripCities.tripId,
+      name: tripCities.name,
+      country: tripCities.country,
+      startDate: tripCities.startDate,
+      endDate: tripCities.endDate,
+      sortOrder: tripCities.sortOrder,
+    })
+    .from(tripCities)
+    .where(inArray(tripCities.tripId, tripIds))
+    .orderBy(tripCities.sortOrder);
   const membersByTrip = new Map<string, typeof members>();
   for (const member of members) {
     const list = membersByTrip.get(member.tripId) ?? [];
     list.push(member);
     membersByTrip.set(member.tripId, list);
   }
+  const citiesByTrip = new Map<string, CityStop[]>();
+  for (const city of cities) {
+    const list = citiesByTrip.get(city.tripId) ?? [];
+    list.push(toCityStop(city));
+    citiesByTrip.set(city.tripId, list);
+  }
   return rows.map((row) =>
     toTrip({
       ...row,
+      cities: citiesByTrip.get(row.id),
       collaborators: sortPlanners(membersByTrip.get(row.id) ?? []).map((member) => toCollaborator(member, viewer)),
     }),
   );
@@ -152,10 +225,27 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
     ...row,
     collaborators: sortPlanners(members).map((member) => toCollaborator(member, viewer)),
   });
+  const cityRows = await db
+    .select({
+      id: tripCities.id,
+      name: tripCities.name,
+      country: tripCities.country,
+      startDate: tripCities.startDate,
+      endDate: tripCities.endDate,
+      sortOrder: tripCities.sortOrder,
+    })
+    .from(tripCities)
+    .where(eq(tripCities.tripId, tripId))
+    .orderBy(tripCities.sortOrder);
+  trip.cities = cityRows.map(toCityStop);
+  if (!trip.cities.length) trip.cities = [fallbackCity(row)];
+  trip.destination = formatCitySummary(trip.cities, row.destination);
+  trip.country = trip.cities[0]?.country || countryFromDestination(row.destination);
   const savedPlaces = await db
     .select({
       id: tripPlaces.id,
       fsqPlaceId: tripPlaces.fsqPlaceId,
+      cityId: tripPlaces.cityId,
       name: tripPlaces.name,
       address: tripPlaces.address,
       neighborhood: tripPlaces.neighborhood,
@@ -165,6 +255,8 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
       note: tripPlaces.note,
       sourceUrl: tripPlaces.sourceUrl,
       saved: tripPlaces.saved,
+      plannedDate: tripPlaces.plannedDate,
+      daySortOrder: tripPlaces.daySortOrder,
       addedBy: tripPlaces.addedBy,
     })
     .from(tripPlaces)
@@ -173,9 +265,30 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
   const namesByUser = new Map(
     trip.collaborators.flatMap((person) => (person.id ? [[person.id, person.name] as const] : [])),
   );
+  const dayNotes = await db
+    .select({
+      id: tripDayNotes.id,
+      cityId: tripDayNotes.cityId,
+      plannedDate: tripDayNotes.plannedDate,
+      note: tripDayNotes.note,
+      sortOrder: tripDayNotes.sortOrder,
+      addedBy: tripDayNotes.addedBy,
+    })
+    .from(tripDayNotes)
+    .where(eq(tripDayNotes.tripId, tripId))
+    .orderBy(tripDayNotes.plannedDate, tripDayNotes.sortOrder);
+  trip.dayNotes = dayNotes.map((note) => ({
+    id: note.id,
+    cityId: note.cityId,
+    plannedDate: asIsoDate(note.plannedDate),
+    note: note.note,
+    sortOrder: note.sortOrder,
+    addedBy: namesByUser.get(note.addedBy) || note.addedBy,
+  }));
   trip.places = savedPlaces.map((place) => ({
     id: place.id,
     fsqPlaceId: place.fsqPlaceId,
+    cityId: place.cityId,
     name: place.name || "Saved place",
     address: place.address ?? "",
     neighborhood: place.neighborhood ?? "",
@@ -184,6 +297,8 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
     sourceUrl: place.sourceUrl ?? undefined,
     coordinates: [Number(place.longitude), Number(place.latitude)] as [number, number],
     saved: place.saved,
+    plannedDate: place.plannedDate ? asIsoDate(place.plannedDate) : null,
+    daySortOrder: place.daySortOrder,
     addedBy: namesByUser.get(place.addedBy) || place.addedBy,
   }));
   return trip;

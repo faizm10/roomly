@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { accountNameSchema, addPlaceSchema, createTripSchema, directionsSchema, signInSchema, signUpSchema, updateTripSchema } from "@/lib/validators";
+import {
+  accountNameSchema,
+  addDayNoteSchema,
+  addPlaceSchema,
+  addTripCitySchema,
+  createTripSchema,
+  directionsSchema,
+  signInSchema,
+  signUpSchema,
+  updatePlacePlanningSchema,
+  updateTripSchema,
+} from "@/lib/validators";
 
 describe("trip validation", () => {
   it("rejects a trip whose return is before departure", () => {
@@ -36,6 +47,47 @@ describe("trip validation", () => {
   it("rejects a place save without a name or coordinates", () => {
     const result = addPlaceSchema.safeParse({ tripId: "210e9464-8cad-406b-96a0-b1463ce0eace", fsqPlaceId: "fsq-1", category: "Eat" });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts a city stop with an optional date range", () => {
+    const result = addTripCitySchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      name: "Porto",
+      country: "Portugal",
+      startDate: "2026-09-20",
+      endDate: "2026-09-22",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a city stop whose end is before its start", () => {
+    const result = addTripCitySchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      name: "Porto",
+      startDate: "2026-09-22",
+      endDate: "2026-09-20",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts assigning a place to a planned day and city", () => {
+    const result = updatePlacePlanningSchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      placeId: "83cb9471-a356-4a42-a13f-23c6fb93bb0c",
+      cityId: "83cb9471-a356-4a42-a13f-23c6fb93bb0d",
+      plannedDate: "2026-09-20",
+      daySortOrder: 1,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a day note with a planned date", () => {
+    const result = addDayNoteSchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      plannedDate: "2026-09-20",
+      note: "Book the early train.",
+    });
+    expect(result.success).toBe(true);
   });
 
   it("caps directions requests at twelve stops", () => {
