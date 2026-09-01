@@ -225,7 +225,7 @@ export function TripWorkspace({
       </aside>
 
       <section className="map-panel">
-        <TripMap places={places} selectedId={selectedId} onSelect={selectPlace} routeActive={Boolean(routeMode)} mapToken={mapToken} />
+        <TripMap destination={details.destination} places={places} selectedId={selectedId} onSelect={selectPlace} routeActive={Boolean(routeMode)} mapToken={mapToken} />
         <div className="map-topbar">
           <button className={`route-button${routeMode ? " active" : ""}`} onClick={() => setRouteMode((current) => current ?? "walking")} type="button"><Route size={16} /> {routeMode ? "Route active" : "Plan a route"}</button>
         </div>
