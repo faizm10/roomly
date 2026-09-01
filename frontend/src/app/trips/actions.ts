@@ -91,6 +91,7 @@ export async function addPlace(input: unknown) {
       })
       .returning({ id: tripPlaces.id });
     revalidatePath("/trips");
+    revalidatePath(`/trips/${data.tripId}`);
     return { demo: false, id: saved.id };
   } catch (error) {
     const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
@@ -113,6 +114,8 @@ export async function updatePlace(input: unknown) {
     .where(and(eq(tripPlaces.id, data.placeId), eq(tripPlaces.tripId, data.tripId)))
     .returning({ id: tripPlaces.id });
   if (!updated) throw new Error("This place could not be updated.");
+  revalidatePath("/trips");
+  revalidatePath(`/trips/${data.tripId}`);
   return { demo: false };
 }
 
@@ -124,6 +127,7 @@ export async function removePlace(input: unknown) {
   await requireEditor(data.tripId, viewer.id);
   await db.delete(tripPlaces).where(and(eq(tripPlaces.id, data.placeId), eq(tripPlaces.tripId, data.tripId)));
   revalidatePath("/trips");
+  revalidatePath(`/trips/${data.tripId}`);
   return { demo: false };
 }
 
