@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   signOut,
   updateAccountName,
@@ -23,6 +23,16 @@ export function AccountPanel({
     updateAccountName,
     null,
   );
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      window.location.replace("/sign-in");
+    }
+  }
 
   return (
     <div className="account-panel">
@@ -61,16 +71,21 @@ export function AccountPanel({
         </button>
       </form>
 
-      <form action={signOut} className="account-sign-out">
-        <button className="button button-full" disabled={demo} type="submit">
-          Sign out
+      <div className="account-sign-out">
+        <button
+          className="button button-full"
+          disabled={demo || signingOut}
+          type="button"
+          onClick={() => void handleSignOut()}
+        >
+          {signingOut ? "Signing out…" : "Sign out"}
         </button>
         <p className="form-footnote">
           {demo
             ? "Sign-out needs a live account. You can still browse the demo trips."
             : "You can always come back to your boards."}
         </p>
-      </form>
+      </div>
     </div>
   );
 }
