@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getViewer } from "@/lib/auth";
 import { getDatabase } from "@/lib/db";
 import { tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
-import { addPlaceSchema, createTripSchema, inviteSchema } from "@/lib/validators";
+import { addPlaceSchema, createTripSchema, inviteSchema, updateTripSchema } from "@/lib/validators";
 
 async function requireViewer() {
   const viewer = await getViewer();
@@ -46,7 +46,13 @@ export async function createTrip(input: unknown) {
     .values({ ...data, ownerId: viewer.id })
     .returning({ id: trips.id });
   try {
-    await db.insert(tripMembers).values({ tripId: trip.id, userId: viewer.id, role: "owner" });
+    await db.insert(tripMembers).values({
+      tripId: trip.id,
+      userId: viewer.id,
+      role: "owner",
+      displayName: viewer.name?.trim() || "Traveller",
+      image: viewer.image || null,
+    });
   } catch (error) {
     await db.delete(trips).where(eq(trips.id, trip.id));
     throw error;
@@ -118,9 +124,33 @@ export async function acceptInvitation(rawToken: string) {
   }
   await db
     .insert(tripMembers)
-    .values({ tripId: invitation.tripId, userId: viewer.id, role: "editor" })
+    .values({
+      tripId: invitation.tripId,
+      userId: viewer.id,
+      role: "editor",
+      displayName: viewer.name?.trim() || "Traveller",
+      image: viewer.image || null,
+    })
     .onConflictDoNothing();
   await db.update(tripInvitations).set({ acceptedAt: new Date() }).where(eq(tripInvitations.id, invitation.id));
   revalidatePath(`/trips/${invitation.tripId}`);
   return { tripId: invitation.tripId, demo: false };
+}
+
+export async function updateTrip(input: unknown) {
+  const viewer = await requireViewer();
+  const data = updateTripSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  const { tripId, ...details } = data;
+  const [updated] = await db
+    .update(trips)
+    .set({ ...details, updatedAt: new Date() })
+    .where(eq(trips.id, tripId))
+    .returning({ id: trips.id });
+  if (!updated) throw new Error("This trip could not be updated.");
+  revalidatePath("/trips");
+  revalidatePath(`/trips/${tripId}`);
+  return { demo: false };
 }
