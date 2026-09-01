@@ -4,7 +4,7 @@ import { AppHeader } from "@/components/app-header";
 import { TripWorkspace } from "@/components/trip-workspace";
 import { getViewer } from "@/lib/auth";
 import { getTrip } from "@/lib/demo-data";
-import { getViewerTrip } from "@/lib/trips";
+import { getViewerTrip, toTripViewer } from "@/lib/trips";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ tripId: s
   const { tripId } = await params;
   const viewer = await getViewer();
   if (viewer && !viewer.demo) {
-    const trip = await getViewerTrip(tripId, viewer.id);
+    const trip = await getViewerTrip(tripId, toTripViewer(viewer));
     if (trip) return { title: trip.title };
   }
   if (tripId === "lisbon-weekender" || viewer?.demo) {
@@ -27,12 +27,12 @@ export default async function TripPage({ params }: { params: Promise<{ tripId: s
   const name = viewer?.name ?? "Traveller";
 
   if (viewer && !viewer.demo) {
-    const trip = await getViewerTrip(tripId, viewer.id);
+    const trip = await getViewerTrip(tripId, toTripViewer(viewer));
     if (trip) {
       return (
         <main className="workspace-page">
           <AppHeader image={viewer?.image} name={name} tripTitle={trip.title} />
-          <TripWorkspace mapToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN} trip={trip} />
+          <TripWorkspace mapToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN} trip={trip} viewer={toTripViewer(viewer)} />
         </main>
       );
     }
@@ -43,7 +43,11 @@ export default async function TripPage({ params }: { params: Promise<{ tripId: s
     return (
       <main className="workspace-page">
         <AppHeader image={viewer?.image} name={name} tripTitle={trip.title} />
-        <TripWorkspace mapToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN} trip={trip} />
+        <TripWorkspace
+          mapToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+          trip={trip}
+          viewer={viewer ? toTripViewer(viewer) : undefined}
+        />
       </main>
     );
   }
