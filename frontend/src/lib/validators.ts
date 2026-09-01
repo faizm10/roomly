@@ -33,3 +33,20 @@ export const inviteSchema = z.object({
   tripId: z.string().uuid(),
   email: z.email().toLowerCase(),
 });
+
+export const signInSchema = z.object({
+  email: z.email("Enter a valid email.").toLowerCase(),
+  password: z.string().min(1, "Enter your password."),
+});
+
+export const signUpSchema = z
+  .object({
+    name: z.string().trim().min(2, "Enter your name.").max(80),
+    email: z.email("Enter a valid email.").toLowerCase(),
+    password: z.string().min(8, "Use at least 8 characters."),
+    confirmPassword: z.string().min(1, "Confirm your password."),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
