@@ -5,7 +5,8 @@ import { getNeonAuth } from "@/lib/auth";
 import { accountNameSchema, signInSchema, signUpSchema } from "@/lib/validators";
 
 export type AuthFormState = {
-  error: string;
+  error?: string;
+  ok?: boolean;
   values?: { name?: string; email?: string };
 } | null;
 
@@ -39,12 +40,15 @@ export async function signInWithEmail(
   const auth = getNeonAuth();
   if (!auth) return unavailable(formData);
 
-  const { error } = await auth.signIn.email(parsed.data);
+  const { error } = await auth.signIn.email({
+    ...parsed.data,
+    callbackURL: "/trips",
+  });
   if (error) {
     return { error: error.message || "Those details did not match an account.", values };
   }
 
-  redirect("/trips");
+  return { ok: true };
 }
 
 export async function signUpWithEmail(
@@ -66,12 +70,17 @@ export async function signUpWithEmail(
   if (!auth) return unavailable(formData);
 
   const { name, email, password } = parsed.data;
-  const { error } = await auth.signUp.email({ name, email, password });
+  const { error } = await auth.signUp.email({
+    name,
+    email,
+    password,
+    callbackURL: "/trips",
+  });
   if (error) {
     return { error: error.message || "The account could not be created.", values };
   }
 
-  redirect("/trips");
+  return { ok: true };
 }
 
 export type AccountFormState = { error: string; name?: string } | null;
@@ -104,5 +113,4 @@ export async function updateAccountName(
 export async function signOut() {
   const auth = getNeonAuth();
   if (auth) await auth.signOut();
-  redirect("/sign-in");
 }
