@@ -1,17 +1,32 @@
 import { z } from "zod";
 import { PLACE_CATEGORIES } from "@/lib/types";
 
-export const createTripSchema = z
-  .object({
-    title: z.string().trim().min(2).max(80),
-    destination: z.string().trim().min(2).max(100),
-    startDate: z.iso.date(),
-    endDate: z.iso.date(),
-  })
-  .refine((data) => data.endDate >= data.startDate, {
-    message: "The return date must be after the start date.",
-    path: ["endDate"],
-  });
+const tripDetailsFields = {
+  title: z.string().trim().min(2).max(80),
+  destination: z.string().trim().min(2).max(100),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
+};
+
+function withReturnAfterStart<T extends z.ZodRawShape>(shape: T) {
+  return z.object(shape).refine(
+    (data) => {
+      const dates = data as { startDate: string; endDate: string };
+      return dates.endDate >= dates.startDate;
+    },
+    {
+      message: "The return date must be after the start date.",
+      path: ["endDate"],
+    },
+  );
+}
+
+export const createTripSchema = withReturnAfterStart(tripDetailsFields);
+
+export const updateTripSchema = withReturnAfterStart({
+  tripId: z.string().uuid(),
+  ...tripDetailsFields,
+});
 
 export const addPlaceSchema = z.object({
   tripId: z.string().min(1),
