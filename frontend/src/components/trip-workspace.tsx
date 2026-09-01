@@ -484,7 +484,7 @@ export function TripWorkspace({
                 <ProfileAvatar image={person.image} key={person.id ?? person.name} name={person.name} size="xs" />
               ))}
             </div>
-            <span>{planners.length} planning</span>
+            <span className="planning-count">{planners.length} {planners.length === 1 ? "planner" : "planning"}</span>
             {saveState !== "idle" ? (
               <span className={`save-status${saveState === "error" ? " error" : ""}`} aria-live="polite">
                 {saveState === "saving" ? "Saving" : saveState === "saved" ? "Saved" : "Couldn’t save"}
