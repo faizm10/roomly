@@ -32,6 +32,12 @@ export type Place = {
   addedBy: string;
 };
 
+export type Collaborator = {
+  id?: string;
+  name: string;
+  image?: string | null;
+};
+
 export type Trip = {
   id: string;
   title: string;
@@ -41,7 +47,13 @@ export type Trip = {
   startDate: string;
   endDate: string;
   places: Place[];
-  collaborators: { initials: string; name: string }[];
+  collaborators: Collaborator[];
+};
+
+export type TripViewer = {
+  id: string;
+  name: string;
+  image?: string | null;
 };
 
 export type PlaceSearchResult = Pick<
