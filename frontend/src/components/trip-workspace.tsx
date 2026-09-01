@@ -23,14 +23,24 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AddPlaceDialog } from "@/components/add-place-dialog";
 import { PlacePhoto } from "@/components/place-photo";
+import { ProfileAvatar } from "@/components/profile-avatar";
+import { TripLogisticsDialog, type TripDetails } from "@/components/trip-logistics-dialog";
 import { TripMap } from "@/components/trip-map";
 import { buildAppleMapsUrl, buildGoogleMapsUrl } from "@/lib/navigation";
-import { PLACE_CATEGORIES, type Place, type PlaceCategory, type TravelMode, type Trip } from "@/lib/types";
+import { PLACE_CATEGORIES, type Collaborator, type Place, type PlaceCategory, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
 
 type RouteStats = { durationSeconds: number; distanceMeters: number };
 type MobileView = "list" | "map";
+
+function plannersFor(collaborators: Collaborator[], viewer?: TripViewer): Collaborator[] {
+  const self = viewer ? { id: viewer.id, name: viewer.name, image: viewer.image } : null;
+  const others = collaborators.filter((person) => person.id && person.id !== self?.id);
+  if (self) return [self, ...others];
+  return collaborators;
+}
 
 const categoryIcons = {
   Eat: Utensils,
@@ -41,18 +51,37 @@ const categoryIcons = {
   Other: MapPin,
 } satisfies Record<PlaceCategory, typeof MapPin>;
 
-export function TripWorkspace({ trip, mapToken }: { trip: Trip; mapToken?: string }) {
+export function TripWorkspace({
+  trip,
+  mapToken,
+  viewer,
+}: {
+  trip: Trip;
+  mapToken?: string;
+  viewer?: TripViewer;
+}) {
+  const router = useRouter();
   const [places, setPlaces] = useState(trip.places);
+  const [details, setDetails] = useState<TripDetails>({
+    title: trip.title,
+    destination: trip.destination,
+    country: trip.country,
+    dateLabel: trip.dateLabel,
+    startDate: trip.startDate,
+    endDate: trip.endDate,
+  });
   const [selectedId, setSelectedId] = useState(trip.places[0]?.id ?? "");
   const [filter, setFilter] = useState<PlaceCategory | "All">("All");
   const [mobileView, setMobileView] = useState<MobileView>("list");
   const [addOpen, setAddOpen] = useState(false);
+  const [logisticsOpen, setLogisticsOpen] = useState(false);
   const [routeMode, setRouteMode] = useState<TravelMode | null>(null);
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const navDialogRef = useRef<HTMLElement>(null);
 
+  const planners = useMemo(() => plannersFor(trip.collaborators, viewer), [trip.collaborators, viewer]);
   const visiblePlaces = useMemo(
     () => (filter === "All" ? places : places.filter((place) => place.category === filter)),
     [filter, places],
@@ -133,12 +162,16 @@ export function TripWorkspace({ trip, mapToken }: { trip: Trip; mapToken?: strin
       <aside className="places-panel">
         <div className="places-panel-header">
           <div className="trip-title-row">
-            <div><p className="eyebrow">{trip.destination} · {trip.dateLabel}</p><h1>{trip.title}</h1></div>
-            <button className="icon-button" aria-label="Trip options" type="button"><MoreHorizontal size={19} /></button>
+            <div><p className="eyebrow">{details.destination} · {details.dateLabel}</p><h1>{details.title}</h1></div>
+            <button className="icon-button trip-options" aria-label="Change where, when, and what" onClick={() => setLogisticsOpen(true)} type="button"><MoreHorizontal size={19} /></button>
           </div>
           <div className="collab-row">
-            <div className="mini-avatars">{trip.collaborators.map((person) => <span key={person.initials} title={person.name}>{person.initials}</span>)}</div>
-            <span>{trip.collaborators.length} planning</span>
+            <div className="mini-avatars">
+              {planners.map((person) => (
+                <ProfileAvatar image={person.image} key={person.id ?? person.name} name={person.name} size="xs" />
+              ))}
+            </div>
+            <span>{planners.length} planning</span>
             <button onClick={share} type="button">{copied ? <Check size={14} /> : <Share2 size={14} />}{copied ? "Link copied" : "Invite"}</button>
           </div>
           <div className="filter-scroll" aria-label="Filter places">
@@ -187,7 +220,7 @@ export function TripWorkspace({ trip, mapToken }: { trip: Trip; mapToken?: strin
             );
           })}
           {!visiblePlaces.length ? <div className="empty-filter"><p>No {filter.toLowerCase()} places yet.</p><button onClick={() => setAddOpen(true)} type="button">Add the first one <Plus size={15} /></button></div> : null}
-          <button className="add-place-row" onClick={() => setAddOpen(true)} type="button"><span><Plus size={18} /></span><div><strong>Add another place</strong><small>Search {trip.destination}</small></div></button>
+          <button className="add-place-row" onClick={() => setAddOpen(true)} type="button"><span><Plus size={18} /></span><div><strong>Add another place</strong><small>Search {details.destination}</small></div></button>
         </div>
       </aside>
 
@@ -213,7 +246,17 @@ export function TripWorkspace({ trip, mapToken }: { trip: Trip; mapToken?: strin
       </section>
 
       <button className="mobile-add-button" onClick={() => setAddOpen(true)} aria-label="Add a place" type="button"><Plus size={22} /></button>
-      {addOpen ? <AddPlaceDialog destination={trip.destination} onAdd={addPlace} onClose={() => setAddOpen(false)} /> : null}
+      {addOpen ? <AddPlaceDialog destination={details.destination} onAdd={addPlace} onClose={() => setAddOpen(false)} /> : null}
+      {logisticsOpen ? (
+        <TripLogisticsDialog
+          onClose={() => setLogisticsOpen(false)}
+          onSave={(next) => {
+            setDetails(next);
+            router.refresh();
+          }}
+          trip={{ ...details, id: trip.id }}
+        />
+      ) : null}
       {navOpen ? (
         <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setNavOpen(false)}>
           <section className="nav-dialog" ref={navDialogRef} role="dialog" aria-modal="true" aria-labelledby="nav-title" tabIndex={-1}>
