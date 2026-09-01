@@ -12,6 +12,10 @@ export type PlaceCategory = (typeof PLACE_CATEGORIES)[number];
 export function categoryClass(category: PlaceCategory | "All") {
   return `category-${category.toLowerCase()}`;
 }
+
+export function isPersistedTripId(id: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
 export type TravelMode = "walking" | "cycling" | "driving";
 
 export type PlacePhoto = {

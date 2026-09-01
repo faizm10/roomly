@@ -422,6 +422,8 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .mini-avatars .mini-avatar:first-child { margin-left: 0; }
 .mini-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .collab-row > button { display: inline-flex; margin-left: auto; align-items: center; gap: 6px; border: 0; border-bottom: 1px solid var(--ink); background: transparent; font-size: 11px; cursor: pointer; }
+.save-status { color: var(--muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.save-status.error { color: var(--cat-eat-ink); }
 .filter-scroll { display: flex; margin-top: 28px; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .filter-scroll::-webkit-scrollbar { display: none; }
 .filter-pill, .category-tag {

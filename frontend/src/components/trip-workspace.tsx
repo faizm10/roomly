@@ -24,16 +24,18 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { addPlace as persistPlace, removePlace as persistRemovePlace, updatePlace as persistUpdatePlace } from "@/app/trips/actions";
 import { AddPlaceDialog } from "@/components/add-place-dialog";
 import { PlacePhoto } from "@/components/place-photo";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { TripLogisticsDialog, type TripDetails } from "@/components/trip-logistics-dialog";
 import { TripMap } from "@/components/trip-map";
 import { buildAppleMapsUrl, buildGoogleMapsPlaceUrl, buildGoogleMapsUrl } from "@/lib/navigation";
-import { PLACE_CATEGORIES, categoryClass, type Collaborator, type Place, type PlaceCategory, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
+import { PLACE_CATEGORIES, categoryClass, isPersistedTripId, type Collaborator, type Place, type PlaceCategory, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
 
 type RouteStats = { durationSeconds: number; distanceMeters: number };
 type MobileView = "list" | "map";
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 function plannersFor(collaborators: Collaborator[], viewer?: TripViewer): Collaborator[] {
   const self = viewer ? { id: viewer.id, name: viewer.name, image: viewer.image } : null;
@@ -79,7 +81,19 @@ export function TripWorkspace({
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const navDialogRef = useRef<HTMLElement>(null);
+  const persistChain = useRef(Promise.resolve());
+  const persistedIds = useRef(new Map<string, string>());
+  const persistable = isPersistedTripId(trip.id);
+
+  function enqueuePersist(work: () => Promise<void>) {
+    setSaveState("saving");
+    persistChain.current = persistChain.current
+      .then(work)
+      .then(() => setSaveState("saved"))
+      .catch(() => setSaveState("error"));
+  }
 
   const planners = useMemo(() => plannersFor(trip.collaborators, viewer), [trip.collaborators, viewer]);
   const visiblePlaces = useMemo(
@@ -113,6 +127,13 @@ export function TripWorkspace({
   }, [places, routeMode]);
 
   useEffect(() => {
+    if (saveState !== "saving") return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [saveState]);
+
+  useEffect(() => {
     if (!navOpen) return;
     navDialogRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -123,21 +144,72 @@ export function TripWorkspace({
   }, [navOpen]);
 
   function addPlace(place: Place) {
-    setPlaces((current) => [...current, place]);
-    setSelectedId(place.id);
+    const next = { ...place, addedBy: viewer?.name || place.addedBy, saved: true };
+    setPlaces((current) => [...current, next]);
+    setSelectedId(next.id);
     setFilter("All");
     setMobileView("list");
+    if (!persistable) return;
+    enqueuePersist(async () => {
+      try {
+        const saved = await persistPlace({
+          tripId: trip.id,
+          fsqPlaceId: next.fsqPlaceId,
+          name: next.name,
+          address: next.address,
+          neighborhood: next.neighborhood,
+          longitude: next.coordinates[0],
+          latitude: next.coordinates[1],
+          category: next.category,
+          note: next.note,
+          sourceUrl: next.sourceUrl ?? "",
+          saved: true,
+        });
+        if (!("id" in saved) || !saved.id) return;
+        persistedIds.current.set(next.id, saved.id);
+        setPlaces((current) => current.map((item) => (item.id === next.id ? { ...item, id: saved.id } : item)));
+        setSelectedId((current) => (current === next.id ? saved.id : current));
+      } catch (error) {
+        setPlaces((current) => current.filter((item) => item.id !== next.id));
+        throw error;
+      }
+    });
   }
 
   function toggleSaved(id: string) {
-    setPlaces((current) => current.map((place) => (place.id === id ? { ...place, saved: !place.saved } : place)));
+    const place = places.find((item) => item.id === id);
+    const nextSaved = !place?.saved;
+    setPlaces((current) => current.map((item) => (item.id === id ? { ...item, saved: !item.saved } : item)));
+    if (!persistable || !place) return;
+    enqueuePersist(async () => {
+      try {
+        const placeId = persistedIds.current.get(id) ?? id;
+        if (placeId.startsWith("local-")) return;
+        await persistUpdatePlace({ tripId: trip.id, placeId, saved: nextSaved });
+      } catch (error) {
+        setPlaces((current) => current.map((item) => (item.id === id ? { ...item, saved: place.saved } : item)));
+        throw error;
+      }
+    });
   }
 
   function removePlace(id: string) {
+    const removed = places.find((place) => place.id === id);
     setPlaces((current) => {
       const next = current.filter((place) => place.id !== id);
       if (selectedId === id) setSelectedId(next[0]?.id ?? "");
       return next;
+    });
+    if (!persistable) return;
+    enqueuePersist(async () => {
+      try {
+        const placeId = persistedIds.current.get(id) ?? id;
+        if (placeId.startsWith("local-")) return;
+        await persistRemovePlace({ tripId: trip.id, placeId });
+      } catch (error) {
+        if (removed) setPlaces((current) => (current.some((place) => place.id === removed.id) ? current : [...current, removed]));
+        throw error;
+      }
     });
   }
 
@@ -175,6 +247,11 @@ export function TripWorkspace({
               ))}
             </div>
             <span>{planners.length} planning</span>
+            {saveState !== "idle" ? (
+              <span className={`save-status${saveState === "error" ? " error" : ""}`} aria-live="polite">
+                {saveState === "saving" ? "Saving" : saveState === "saved" ? "Saved" : "Couldn’t save"}
+              </span>
+            ) : null}
             <button onClick={share} type="button">{copied ? <Check size={14} /> : <Share2 size={14} />}{copied ? "Link copied" : "Invite"}</button>
           </div>
           <div className="filter-scroll" aria-label="Filter places">

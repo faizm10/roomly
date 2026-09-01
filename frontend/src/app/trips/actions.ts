@@ -1,12 +1,12 @@
 "use server";
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getViewer } from "@/lib/auth";
 import { getDatabase } from "@/lib/db";
 import { tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
-import { addPlaceSchema, createTripSchema, inviteSchema, updateTripSchema } from "@/lib/validators";
+import { addPlaceSchema, createTripSchema, inviteSchema, removePlaceSchema, updatePlaceSchema, updateTripSchema } from "@/lib/validators";
 
 async function requireViewer() {
   const viewer = await getViewer();
@@ -67,25 +67,63 @@ export async function addPlace(input: unknown) {
   const db = getDatabase();
   if (!db) return { demo: true };
   await requireEditor(data.tripId, viewer.id);
-  await db.insert(tripPlaces).values({
-    tripId: data.tripId,
-    fsqPlaceId: data.fsqPlaceId,
-    category: data.category,
-    note: data.note,
-    sourceUrl: data.sourceUrl || null,
-    addedBy: viewer.id,
-  });
-  revalidatePath(`/trips/${data.tripId}`);
+  const [order] = await db
+    .select({ next: sql<number>`coalesce(max(${tripPlaces.sortOrder}), -1) + 1` })
+    .from(tripPlaces)
+    .where(eq(tripPlaces.tripId, data.tripId));
+  try {
+    const [saved] = await db
+      .insert(tripPlaces)
+      .values({
+        tripId: data.tripId,
+        fsqPlaceId: data.fsqPlaceId,
+        name: data.name,
+        address: data.address,
+        neighborhood: data.neighborhood,
+        longitude: data.longitude,
+        latitude: data.latitude,
+        category: data.category,
+        note: data.note,
+        sourceUrl: data.sourceUrl || null,
+        saved: data.saved,
+        sortOrder: Number(order?.next ?? 0),
+        addedBy: viewer.id,
+      })
+      .returning({ id: tripPlaces.id });
+    revalidatePath("/trips");
+    return { demo: false, id: saved.id };
+  } catch (error) {
+    const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+    if (message.includes("trip_places_provider_unique") || message.includes("duplicate key")) {
+      throw new Error("That place is already on this trip.");
+    }
+    throw error;
+  }
+}
+
+export async function updatePlace(input: unknown) {
+  const viewer = await requireViewer();
+  const data = updatePlaceSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  const [updated] = await db
+    .update(tripPlaces)
+    .set({ saved: data.saved })
+    .where(and(eq(tripPlaces.id, data.placeId), eq(tripPlaces.tripId, data.tripId)))
+    .returning({ id: tripPlaces.id });
+  if (!updated) throw new Error("This place could not be updated.");
   return { demo: false };
 }
 
-export async function removePlace(input: { tripId: string; placeId: string }) {
+export async function removePlace(input: unknown) {
   const viewer = await requireViewer();
+  const data = removePlaceSchema.parse(input);
   const db = getDatabase();
   if (!db) return { demo: true };
-  await requireEditor(input.tripId, viewer.id);
-  await db.delete(tripPlaces).where(and(eq(tripPlaces.id, input.placeId), eq(tripPlaces.tripId, input.tripId)));
-  revalidatePath(`/trips/${input.tripId}`);
+  await requireEditor(data.tripId, viewer.id);
+  await db.delete(tripPlaces).where(and(eq(tripPlaces.id, data.placeId), eq(tripPlaces.tripId, data.tripId)));
+  revalidatePath("/trips");
   return { demo: false };
 }
 

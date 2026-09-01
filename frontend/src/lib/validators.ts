@@ -29,11 +29,28 @@ export const updateTripSchema = withReturnAfterStart({
 });
 
 export const addPlaceSchema = z.object({
-  tripId: z.string().min(1),
+  tripId: z.string().uuid(),
   fsqPlaceId: z.string().min(1).max(255),
+  name: z.string().trim().min(1).max(200),
+  address: z.string().trim().max(300).default(""),
+  neighborhood: z.string().trim().max(120).default(""),
+  longitude: z.number().min(-180).max(180),
+  latitude: z.number().min(-90).max(90),
   category: z.enum(PLACE_CATEGORIES),
   note: z.string().trim().max(500).default(""),
   sourceUrl: z.url().optional().or(z.literal("")),
+  saved: z.boolean().default(true),
+});
+
+export const updatePlaceSchema = z.object({
+  tripId: z.string().uuid(),
+  placeId: z.string().uuid(),
+  saved: z.boolean(),
+});
+
+export const removePlaceSchema = z.object({
+  tripId: z.string().uuid(),
+  placeId: z.string().uuid(),
 });
 
 export const directionsSchema = z.object({

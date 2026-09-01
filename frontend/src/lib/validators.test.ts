@@ -17,9 +17,25 @@ describe("trip validation", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts user-authored place fields without a provider snapshot", () => {
-    const result = addPlaceSchema.safeParse({ tripId: "trip-1", fsqPlaceId: "fsq-1", category: "Eat", note: "Lunch", sourceUrl: "https://example.com/post" });
+  it("accepts a saved place snapshot with coordinates", () => {
+    const result = addPlaceSchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      fsqPlaceId: "fsq-1",
+      name: "Prado",
+      address: "R. das Pedras Negras 2",
+      neighborhood: "Baixa",
+      longitude: -9.1349,
+      latitude: 38.7107,
+      category: "Eat",
+      note: "Lunch",
+      sourceUrl: "https://example.com/post",
+    });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects a place save without a name or coordinates", () => {
+    const result = addPlaceSchema.safeParse({ tripId: "210e9464-8cad-406b-96a0-b1463ce0eace", fsqPlaceId: "fsq-1", category: "Eat" });
+    expect(result.success).toBe(false);
   });
 
   it("caps directions requests at twelve stops", () => {

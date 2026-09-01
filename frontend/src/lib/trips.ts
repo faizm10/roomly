@@ -156,26 +156,35 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
     .select({
       id: tripPlaces.id,
       fsqPlaceId: tripPlaces.fsqPlaceId,
+      name: tripPlaces.name,
+      address: tripPlaces.address,
+      neighborhood: tripPlaces.neighborhood,
+      longitude: tripPlaces.longitude,
+      latitude: tripPlaces.latitude,
       category: tripPlaces.category,
       note: tripPlaces.note,
       sourceUrl: tripPlaces.sourceUrl,
+      saved: tripPlaces.saved,
       addedBy: tripPlaces.addedBy,
     })
     .from(tripPlaces)
     .where(eq(tripPlaces.tripId, tripId))
     .orderBy(tripPlaces.sortOrder);
+  const namesByUser = new Map(
+    trip.collaborators.flatMap((person) => (person.id ? [[person.id, person.name] as const] : [])),
+  );
   trip.places = savedPlaces.map((place) => ({
     id: place.id,
     fsqPlaceId: place.fsqPlaceId,
-    name: place.note || "Saved place",
-    address: "",
-    neighborhood: "",
+    name: place.name || "Saved place",
+    address: place.address ?? "",
+    neighborhood: place.neighborhood ?? "",
     category: place.category as PlaceCategory,
     note: place.note,
     sourceUrl: place.sourceUrl ?? undefined,
-    coordinates: [0, 0] as [number, number],
-    saved: true,
-    addedBy: place.addedBy,
+    coordinates: [Number(place.longitude), Number(place.latitude)] as [number, number],
+    saved: place.saved,
+    addedBy: namesByUser.get(place.addedBy) || place.addedBy,
   }));
   return trip;
 }

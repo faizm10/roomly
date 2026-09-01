@@ -15,6 +15,13 @@
       "when": 1788241514811,
       "tag": "0001_trip_member_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788247719473,
+      "tag": "0002_trip_place_snapshots",
+      "breakpoints": true
     }
   ]
 }
