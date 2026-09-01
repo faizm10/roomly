@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import {
+  GOOGLE_AUTH_CHANNEL,
+  GOOGLE_AUTH_MESSAGE,
+  tripsUrlWithVerifier,
+  type GoogleAuthMessage,
+} from "@/lib/google-auth";
 
 function GoogleMark() {
   return (
@@ -25,6 +31,28 @@ function GoogleMark() {
   );
 }
 
+function isGoogleAuthMessage(data: unknown): data is GoogleAuthMessage {
+  return Boolean(data && typeof data === "object" && "type" in data && data.type === GOOGLE_AUTH_MESSAGE);
+}
+
+async function requestGoogleUrl() {
+  const response = await fetch("/api/auth/sign-in/social", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider: "google",
+      callbackURL: `${window.location.origin}/auth/callback`,
+      disableRedirect: true,
+    }),
+  });
+  const body = (await response.json()) as { url?: string; error?: string };
+  if (!response.ok || !body.url) {
+    throw new Error(body.error ?? "Google sign-in could not start.");
+  }
+  return body.url;
+}
+
 export function GoogleSignInButton({
   authEnabled,
   label,
@@ -40,22 +68,80 @@ export function GoogleSignInButton({
       setError("Google sign-in is unavailable right now.");
       return;
     }
+
+    const tab = window.open("about:blank", "roamboard_google");
     setBusy(true);
     setError("");
-    try {
-      const response = await fetch("/api/auth/sign-in/social", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "google", callbackURL: "/trips" }),
-      });
-      const body = (await response.json()) as { url?: string; error?: string };
-      if (!response.ok || !body.url) {
-        throw new Error(body.error ?? "Google sign-in could not start.");
+
+    if (!tab) {
+      try {
+        const url = await requestGoogleUrl();
+        window.location.assign(url);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Google sign-in could not start.");
+        setBusy(false);
       }
-      window.location.assign(body.url);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Google sign-in could not start.");
+      return;
+    }
+
+    let settled = false;
+    let channel: BroadcastChannel | null = null;
+
+    function finish(verifier?: string | null) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      window.focus();
+      window.location.replace(tripsUrlWithVerifier(verifier));
+    }
+
+    function fail(message: string) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      try {
+        tab?.close();
+      } catch {
+        /* The Google tab may already be gone. */
+      }
+      setError(message);
       setBusy(false);
+    }
+
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (!isGoogleAuthMessage(event.data)) return;
+      finish(event.data.verifier);
+    }
+
+    function cleanup() {
+      window.removeEventListener("message", onMessage);
+      channel?.close();
+      window.clearInterval(closedPoll);
+      window.clearTimeout(timeout);
+    }
+
+    const closedPoll = window.setInterval(() => {
+      if (tab.closed && !settled) fail("Google sign-in was closed before it finished.");
+    }, 400);
+    const timeout = window.setTimeout(() => {
+      fail("Google sign-in took too long. Try again.");
+    }, 120_000);
+
+    window.addEventListener("message", onMessage);
+    try {
+      channel = new BroadcastChannel(GOOGLE_AUTH_CHANNEL);
+      channel.onmessage = (event) => {
+        if (isGoogleAuthMessage(event.data)) finish(event.data.verifier);
+      };
+    } catch {
+      channel = null;
+    }
+
+    try {
+      tab.location.assign(await requestGoogleUrl());
+    } catch (reason) {
+      fail(reason instanceof Error ? reason.message : "Google sign-in could not start.");
     }
   }
 
@@ -65,10 +151,10 @@ export function GoogleSignInButton({
         className="button button-full google-button"
         disabled={busy || !authEnabled}
         type="button"
-        onClick={signIn}
+        onClick={() => void signIn()}
       >
         <GoogleMark />
-        {busy ? "Opening Google…" : label}
+        {busy ? "Waiting for Google…" : label}
       </button>
       {error ? (
         <p className="form-error" role="alert">
