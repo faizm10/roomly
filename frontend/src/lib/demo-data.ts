@@ -76,9 +76,9 @@ export const demoTrips: Trip[] = [
     endDate: "2026-09-22",
     places: demoPlaces,
     collaborators: [
-      { initials: "FM", name: "Faiz" },
-      { initials: "AS", name: "Ana" },
-      { initials: "JK", name: "Jon" },
+      { name: "Faiz" },
+      { name: "Ana" },
+      { name: "Jon" },
     ],
   },
   {
@@ -90,7 +90,7 @@ export const demoTrips: Trip[] = [
     startDate: "2026-11-03",
     endDate: "2026-11-09",
     places: demoPlaces.slice(0, 3),
-    collaborators: [{ initials: "FM", name: "Faiz" }],
+    collaborators: [{ name: "Faiz" }],
   },
   {
     id: "montreal-summer",
@@ -102,8 +102,8 @@ export const demoTrips: Trip[] = [
     endDate: "2027-07-13",
     places: demoPlaces.slice(0, 4),
     collaborators: [
-      { initials: "FM", name: "Faiz" },
-      { initials: "RB", name: "Rae" },
+      { name: "Faiz" },
+      { name: "Rae" },
     ],
   },
 ];
