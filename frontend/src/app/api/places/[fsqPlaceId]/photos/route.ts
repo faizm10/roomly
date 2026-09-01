@@ -1,3 +1,4 @@
+import { googlePlacePhotoUrl } from "@/lib/google-maps";
 import type { PlacePhoto } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ fsqP
   const { fsqPlaceId } = await params;
   const apiKey = process.env.FOURSQUARE_API_KEY;
   const placeName = new URL(request.url).searchParams.get("name")?.trim() || "Saved place";
+
+  const googlePhoto = await googlePlacePhotoUrl(fsqPlaceId, placeName).catch(() => null);
+  if (googlePhoto) {
+    return Response.json({ photo: googlePhoto, demo: false, provider: "google" }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   if (!apiKey || fsqPlaceId.startsWith("demo-")) {
     return Response.json({ photo: null, demo: true }, { headers: { "Cache-Control": "no-store" } });
