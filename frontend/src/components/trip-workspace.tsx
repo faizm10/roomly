@@ -29,8 +29,8 @@ import { PlacePhoto } from "@/components/place-photo";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { TripLogisticsDialog, type TripDetails } from "@/components/trip-logistics-dialog";
 import { TripMap } from "@/components/trip-map";
-import { buildAppleMapsUrl, buildGoogleMapsUrl } from "@/lib/navigation";
-import { PLACE_CATEGORIES, type Collaborator, type Place, type PlaceCategory, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
+import { buildAppleMapsUrl, buildGoogleMapsPlaceUrl, buildGoogleMapsUrl } from "@/lib/navigation";
+import { PLACE_CATEGORIES, categoryClass, type Collaborator, type Place, type PlaceCategory, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
 
 type RouteStats = { durationSeconds: number; distanceMeters: number };
 type MobileView = "list" | "map";
@@ -163,7 +163,10 @@ export function TripWorkspace({
         <div className="places-panel-header">
           <div className="trip-title-row">
             <div><p className="eyebrow">{details.destination} · {details.dateLabel}</p><h1>{details.title}</h1></div>
-            <button className="icon-button trip-options" aria-label="Change where, when, and what" onClick={() => setLogisticsOpen(true)} type="button"><MoreHorizontal size={19} /></button>
+            <div className="trip-header-actions">
+              <button className="icon-button trip-options" aria-label="Add a place" onClick={() => setAddOpen(true)} type="button"><Plus size={19} /></button>
+              <button className="icon-button trip-options" aria-label="Change where, when, and what" onClick={() => setLogisticsOpen(true)} type="button"><MoreHorizontal size={19} /></button>
+            </div>
           </div>
           <div className="collab-row">
             <div className="mini-avatars">
@@ -175,10 +178,10 @@ export function TripWorkspace({
             <button onClick={share} type="button">{copied ? <Check size={14} /> : <Share2 size={14} />}{copied ? "Link copied" : "Invite"}</button>
           </div>
           <div className="filter-scroll" aria-label="Filter places">
-            <button className={`filter-pill${filter === "All" ? " active" : ""}`} onClick={() => setFilter("All")} type="button">All</button>
+            <button className={`filter-pill filter-all${filter === "All" ? " active" : ""}`} onClick={() => setFilter("All")} type="button">All</button>
             {PLACE_CATEGORIES.map((item) => {
               const Icon = categoryIcons[item];
-              return <button className={`filter-pill${filter === item ? " active" : ""}`} onClick={() => setFilter(item)} key={item} type="button"><Icon size={13} /> {item}</button>;
+              return <button className={`filter-pill ${categoryClass(item)}${filter === item ? " active" : ""}`} onClick={() => setFilter(item)} key={item} type="button"><Icon size={13} /> {item}</button>;
             })}
           </div>
         </div>
@@ -203,9 +206,23 @@ export function TripWorkspace({
                 <div className="itinerary-rail"><span>{number}</span><i /></div>
                 <PlacePhoto fsqPlaceId={place.fsqPlaceId} name={place.name} label={place.category} />
                 <div className="saved-place-copy">
-                  <p className="place-kicker">{place.category} · {place.neighborhood}</p>
+                  <p className="place-kicker">
+                    <span className={`category-tag ${categoryClass(place.category)}`}>{place.category}</span>
+                    {place.neighborhood ? <span className="place-hood">{place.neighborhood}</span> : null}
+                  </p>
                   <h2>{place.name}</h2>
-                  <small>{place.address}</small>
+                  <small className="place-address">
+                    {place.address}
+                    <a
+                      href={buildGoogleMapsPlaceUrl(place)}
+                      aria-label={`Open ${place.name} in Google Maps`}
+                      onClick={(event) => event.stopPropagation()}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      🗺️
+                    </a>
+                  </small>
                   <p className="place-note">{place.note || "No note yet. Add the detail that made this place worth saving."}</p>
                   <div className="place-actions">
                     <span className="contributor">Added by {place.addedBy}</span>
