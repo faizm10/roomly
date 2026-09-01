@@ -8,6 +8,13 @@
       "when": 1788199397307,
       "tag": "0000_powerful_jack_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788241514811,
+      "tag": "0001_trip_member_profiles",
+      "breakpoints": true
     }
   ]
 }
