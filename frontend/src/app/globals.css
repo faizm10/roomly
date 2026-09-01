@@ -253,7 +253,10 @@ a { color: inherit; text-decoration: none; }
 .app-nav a.active { border-bottom-color: var(--ink); color: var(--ink); font-weight: 650; }
 .app-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
 .new-trip-link { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
-.profile-chip { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--ink); border-radius: 50%; background: var(--paper); font-size: 10px; font-weight: 700; cursor: pointer; }
+.profile-chip-link { display: grid; border-radius: 50%; }
+.profile-chip { display: grid; width: 36px; height: 36px; place-items: center; overflow: hidden; border: 1px solid var(--ink); border-radius: 50%; background: var(--paper); font-size: 10px; font-weight: 700; }
+.profile-chip img, .profile-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.profile-avatar { display: grid; width: 88px; height: 88px; flex: none; place-items: center; overflow: hidden; border: 1px solid var(--ink); border-radius: 50%; background: var(--paper); font-size: 22px; font-weight: 700; }
 .app-header-trip { display: flex; min-width: 0; flex-direction: column; text-align: center; }
 .app-header-trip span { color: var(--muted); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
 .app-header-trip strong { margin-top: 3px; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
@@ -262,6 +265,18 @@ a { color: inherit; text-decoration: none; }
 .trips-heading h1 { margin: 18px 0 0; font-size: clamp(55px, 6.4vw, 90px); font-weight: 590; letter-spacing: -.07em; line-height: .94; }
 .trips-heading-note { display: flex; max-width: 340px; flex-direction: column; align-items: flex-start; gap: 20px; }
 .trips-heading-note > p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.trips-empty { padding: 48px 4px 32px; border-bottom: 1px solid var(--line); }
+.trips-empty h2 { margin: 10px 0 10px; font-size: clamp(28px, 3.2vw, 38px); font-weight: 570; letter-spacing: -.045em; }
+.trips-empty p { max-width: 440px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.account-shell { width: min(100% - 56px, 560px); margin: 0 auto; padding: 72px 0 96px; }
+.account-shell h1 { margin: 12px 0 10px; font-size: clamp(36px, 5vw, 52px); font-weight: 570; letter-spacing: -.06em; line-height: 1.05; }
+.account-lede { margin: 0 0 36px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.account-identity { display: flex; gap: 18px; align-items: center; margin-bottom: 32px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+.account-identity h2 { margin: 0 0 6px; font-size: 22px; font-weight: 570; letter-spacing: -.03em; }
+.account-identity p { margin: 0; color: var(--muted); font-size: 14px; }
+.account-hint { margin: -6px 0 18px; color: var(--muted); font-size: 12px; }
+.account-form input:disabled { color: var(--muted); background: var(--surface); }
+.account-sign-out { margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--line); }
 .trip-index-list { border-top: 1px solid var(--ink); }
 .trip-card { position: relative; display: grid; min-height: 190px; grid-template-columns: 190px 1fr; border-bottom: 1px solid var(--line); background: var(--paper); transition: background 140ms ease; }
 .trip-card:hover { background: var(--surface); }
@@ -581,6 +596,8 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
   .trips-heading { align-items: flex-start; flex-direction: column; gap: 30px; }
   .trips-heading h1 { font-size: 53px; }
   .trips-heading-note { max-width: none; }
+  .account-shell { width: min(100% - 32px, 560px); padding: 48px 0 72px; }
+  .account-identity { align-items: flex-start; }
   .trip-card { min-height: 235px; grid-template-columns: 105px 1fr; }
   .trip-cover { min-height: 170px; margin: 18px 0; }
   .trip-card-body { padding: 26px 32px 26px 20px; }
