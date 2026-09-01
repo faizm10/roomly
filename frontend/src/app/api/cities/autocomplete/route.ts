@@ -1,4 +1,5 @@
 import { formatCityLabel, filterDemoCities, type CitySuggestion } from "@/lib/cities";
+import { googleCitySuggestions } from "@/lib/google-maps";
 
 export const dynamic = "force-dynamic";
 
@@ -6,6 +7,7 @@ type MapboxFeature = {
   id?: string;
   text?: string;
   place_name?: string;
+  center?: [number, number];
   context?: Array<{ id?: string; text?: string }>;
 };
 
@@ -16,6 +18,11 @@ function contextPart(feature: MapboxFeature, prefix: string) {
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
   if (query.length < 2) return Response.json({ results: [], demo: false });
+
+  const google = await googleCitySuggestions(query).catch(() => null);
+  if (google?.length) {
+    return Response.json({ results: google, demo: false, provider: "google" }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   const token = process.env.MAPBOX_ACCESS_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   if (!token) {
@@ -49,8 +56,9 @@ export async function GET(request: Request) {
       label,
       region,
       country,
+      coordinates: feature.center,
     });
   }
 
-  return Response.json({ results, demo: false }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ results, demo: false, provider: "mapbox" }, { headers: { "Cache-Control": "no-store" } });
 }
