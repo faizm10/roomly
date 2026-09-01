@@ -48,15 +48,14 @@ export function TripMap({ destination, places, selectedId, routeActive, mapToken
   const mapboxRef = useRef<typeof import("mapbox-gl").default | null>(null);
   const markersRef = useRef<Map<string, import("mapbox-gl").Marker>>(new Map());
   const shownDestinationRef = useRef("");
-  const destinationRef = useRef(destination);
-  destinationRef.current = destination;
+  const initialDestinationRef = useRef(destination);
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (!mapToken || !containerRef.current) return;
     let active = true;
     const markerMap = markersRef.current;
-    const openingDestination = destinationRef.current;
+    const openingDestination = initialDestinationRef.current;
 
     async function mountMap() {
       const mapboxPackage = await import("mapbox-gl");
