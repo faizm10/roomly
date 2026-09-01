@@ -1,5 +1,11 @@
 import type { Place, TravelMode } from "@/lib/types";
 
+export function buildGoogleMapsPlaceUrl(place: Place) {
+  const [lng, lat] = place.coordinates;
+  const params = new URLSearchParams({ api: "1", query: `${lat},${lng}` });
+  return `https://www.google.com/maps/search/?${params.toString()}`;
+}
+
 export function buildGoogleMapsUrl(places: Place[], mode: TravelMode) {
   const [origin, ...rest] = places;
   const destination = rest.at(-1) ?? origin;
