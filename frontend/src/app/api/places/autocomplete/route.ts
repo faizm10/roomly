@@ -1,4 +1,5 @@
 import { demoSearchResults } from "@/lib/demo-data";
+import { googlePlaceSearch } from "@/lib/google-maps";
 import type { PlaceCategory, PlaceSearchResult } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.get("q")?.trim() ?? "";
   const near = url.searchParams.get("near")?.trim() || "Lisbon, Portugal";
+
+  const google = await googlePlaceSearch(query, near).catch(() => null);
+  if (google) {
+    return Response.json({ results: google, demo: false, provider: "google" }, { headers: { "Cache-Control": "no-store" } });
+  }
+
   const apiKey = process.env.FOURSQUARE_API_KEY;
 
   if (!apiKey) {
@@ -61,5 +68,5 @@ export async function GET(request: Request) {
       category: normalizeCategory(place.categories?.[0]?.name),
     }];
   });
-  return Response.json({ results, demo: false }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ results, demo: false, provider: "foursquare" }, { headers: { "Cache-Control": "no-store" } });
 }
