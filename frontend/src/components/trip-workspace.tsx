@@ -10,7 +10,7 @@ import {
   Footprints,
   Landmark,
   List,
-  Map,
+  Map as MapIcon,
   MapPin,
   MoreHorizontal,
   Navigation,
@@ -228,7 +228,7 @@ export function TripWorkspace({
     <div className={`trip-workspace mobile-${mobileView}`}>
       <div className="mobile-view-switch" role="tablist" aria-label="Trip view">
         <button role="tab" aria-selected={mobileView === "list"} className={mobileView === "list" ? "active" : ""} onClick={() => setMobileView("list")} type="button"><List size={15} /> List</button>
-        <button role="tab" aria-selected={mobileView === "map"} className={mobileView === "map" ? "active" : ""} onClick={() => setMobileView("map")} type="button"><Map size={15} /> Map</button>
+        <button role="tab" aria-selected={mobileView === "map"} className={mobileView === "map" ? "active" : ""} onClick={() => setMobileView("map")} type="button"><MapIcon size={15} /> Map</button>
       </div>
 
       <aside className="places-panel">
