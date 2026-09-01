@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addPlaceSchema, createTripSchema, directionsSchema, signInSchema, signUpSchema } from "@/lib/validators";
+import { accountNameSchema, addPlaceSchema, createTripSchema, directionsSchema, signInSchema, signUpSchema } from "@/lib/validators";
 
 describe("trip validation", () => {
   it("rejects a trip whose return is before departure", () => {
@@ -41,5 +41,9 @@ describe("auth validation", () => {
       confirmPassword: "longenough",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects an account name that is too short", () => {
+    expect(accountNameSchema.safeParse({ name: "A" }).success).toBe(false);
   });
 });
