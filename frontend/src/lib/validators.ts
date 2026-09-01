@@ -50,3 +50,7 @@ export const signUpSchema = z
     message: "Passwords do not match.",
     path: ["confirmPassword"],
   });
+
+export const accountNameSchema = z.object({
+  name: z.string().trim().min(2, "Enter your name.").max(80),
+});
