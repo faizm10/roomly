@@ -1,22 +1,52 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { TripWorkspace } from "@/components/trip-workspace";
+import { getViewer } from "@/lib/auth";
 import { getTrip } from "@/lib/demo-data";
+import { getViewerTrip } from "@/lib/trips";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ tripId: string }> }): Promise<Metadata> {
   const { tripId } = await params;
-  return { title: getTrip(tripId).title };
+  const viewer = await getViewer();
+  if (viewer && !viewer.demo) {
+    const trip = await getViewerTrip(tripId, viewer.id);
+    if (trip) return { title: trip.title };
+  }
+  if (tripId === "lisbon-weekender" || viewer?.demo) {
+    return { title: getTrip(tripId).title };
+  }
+  return { title: "Trip" };
 }
 
 export default async function TripPage({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const trip = getTrip(tripId);
-  return (
-    <main className="workspace-page">
-      <AppHeader tripTitle={trip.title} />
-      <TripWorkspace trip={trip} mapToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN} />
-    </main>
-  );
+  const viewer = await getViewer();
+  const name = viewer?.name ?? "Traveller";
+
+  if (viewer && !viewer.demo) {
+    const trip = await getViewerTrip(tripId, viewer.id);
+    if (trip) {
+      return (
+        <main className="workspace-page">
+          <AppHeader image={viewer?.image} name={name} tripTitle={trip.title} />
+          <TripWorkspace mapToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN} trip={trip} />
+        </main>
+      );
+    }
+  }
+
+  if (tripId === "lisbon-weekender" || viewer?.demo) {
+    const trip = getTrip(tripId);
+    return (
+      <main className="workspace-page">
+        <AppHeader image={viewer?.image} name={name} tripTitle={trip.title} />
+        <TripWorkspace mapToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN} trip={trip} />
+      </main>
+    );
+  }
+
+  notFound();
 }
