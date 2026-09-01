@@ -1,4 +1,4 @@
-type AvatarSize = "sm" | "lg";
+type AvatarSize = "xs" | "sm" | "lg";
 
 export function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -17,13 +17,17 @@ export function ProfileAvatar({
   image?: string | null;
   size?: AvatarSize;
 }) {
-  const className = size === "lg" ? "profile-avatar profile-avatar-lg" : "profile-chip";
+  const className = size === "lg" ? "profile-avatar profile-avatar-lg" : size === "xs" ? "mini-avatar" : "profile-chip";
   if (image) {
     return (
-      <span className={className}>
+      <span className={className} title={name}>
         <img alt="" referrerPolicy="no-referrer" src={image} />
       </span>
     );
   }
-  return <span className={className}>{initialsFromName(name)}</span>;
+  return (
+    <span className={className} title={name}>
+      {initialsFromName(name)}
+    </span>
+  );
 }
