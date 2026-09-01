@@ -41,16 +41,18 @@ export async function createTrip(input: unknown) {
   const data = createTripSchema.parse(input);
   const db = getDatabase();
   if (!db) return { id: "lisbon-weekender", demo: true };
-  const id = await db.transaction(async (tx) => {
-    const [trip] = await tx
-      .insert(trips)
-      .values({ ...data, ownerId: viewer.id })
-      .returning({ id: trips.id });
-    await tx.insert(tripMembers).values({ tripId: trip.id, userId: viewer.id, role: "owner" });
-    return trip.id;
-  });
+  const [trip] = await db
+    .insert(trips)
+    .values({ ...data, ownerId: viewer.id })
+    .returning({ id: trips.id });
+  try {
+    await db.insert(tripMembers).values({ tripId: trip.id, userId: viewer.id, role: "owner" });
+  } catch (error) {
+    await db.delete(trips).where(eq(trips.id, trip.id));
+    throw error;
+  }
   revalidatePath("/trips");
-  return { id, demo: false };
+  return { id: trip.id, demo: false };
 }
 
 export async function addPlace(input: unknown) {
@@ -114,13 +116,11 @@ export async function acceptInvitation(rawToken: string) {
   if (!viewer.email || viewer.email.toLowerCase() !== invitation.email.toLowerCase()) {
     throw new Error("Sign in with the email address that received this invitation.");
   }
-  await db.transaction(async (tx) => {
-    await tx
-      .insert(tripMembers)
-      .values({ tripId: invitation.tripId, userId: viewer.id, role: "editor" })
-      .onConflictDoNothing();
-    await tx.update(tripInvitations).set({ acceptedAt: new Date() }).where(eq(tripInvitations.id, invitation.id));
-  });
+  await db
+    .insert(tripMembers)
+    .values({ tripId: invitation.tripId, userId: viewer.id, role: "editor" })
+    .onConflictDoNothing();
+  await db.update(tripInvitations).set({ acceptedAt: new Date() }).where(eq(tripInvitations.id, invitation.id));
   revalidatePath(`/trips/${invitation.tripId}`);
   return { tripId: invitation.tripId, demo: false };
 }
