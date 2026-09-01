@@ -13,8 +13,8 @@ export function SiteHeader() {
         <Link className="text-link" href="/sign-in">
           Sign in
         </Link>
-        <Link className="button button-small button-ink" href="/trips">
-          Open Roamboard <span aria-hidden="true">↗</span>
+        <Link className="button button-small button-ink" href="/sign-up">
+          Create account
         </Link>
       </div>
     </header>
