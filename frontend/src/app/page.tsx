@@ -97,6 +97,7 @@ export default function Home() {
         <div>
           <strong>Roamboard</strong>
           <span>Good places belong together.</span>
+          <span>© 2026</span>
         </div>
         <div>
           <Link href="/trips/lisbon-weekender">Example trip</Link>
@@ -104,7 +105,6 @@ export default function Home() {
           <Link href="/sign-up">Create account</Link>
           <a href="mailto:hello@roamboard.app">Say hello</a>
         </div>
-        <span>© 2026 Roamboard</span>
       </footer>
     </main>
   );
