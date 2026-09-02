@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { countryFromDestination, formatDateLabel } from "@/lib/dates";
 import { getDatabase } from "@/lib/db";
 import { tripCities, tripDayNotes, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
@@ -39,6 +39,11 @@ function destinationParts(destination: string) {
 function isPlanningSchemaMissing(error: unknown) {
   const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
   return /trip_cities|trip_day_notes|city_id|planned_date|day_sort_order|relation .* does not exist|column .* does not exist/i.test(message);
+}
+
+function isUniqueConstraintError(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /duplicate key|trip_cities_trip_sort_unique/i.test(message);
 }
 
 function toCityStop(row: {
@@ -268,6 +273,47 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
   } catch (error) {
     if (!isPlanningSchemaMissing(error)) throw error;
     planningSchemaAvailable = false;
+  }
+  if (planningSchemaAvailable && !cityRows.length) {
+    const destination = destinationParts(row.destination);
+    try {
+      cityRows = await db
+        .insert(tripCities)
+        .values({
+          tripId,
+          name: destination.name,
+          country: destination.country,
+          startDate: asIsoDate(row.startDate),
+          endDate: asIsoDate(row.endDate),
+          sortOrder: 0,
+        })
+        .returning({
+          id: tripCities.id,
+          name: tripCities.name,
+          country: tripCities.country,
+          startDate: tripCities.startDate,
+          endDate: tripCities.endDate,
+          sortOrder: tripCities.sortOrder,
+        });
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) throw error;
+      cityRows = await db
+        .select({
+          id: tripCities.id,
+          name: tripCities.name,
+          country: tripCities.country,
+          startDate: tripCities.startDate,
+          endDate: tripCities.endDate,
+          sortOrder: tripCities.sortOrder,
+        })
+        .from(tripCities)
+        .where(and(eq(tripCities.tripId, tripId), eq(tripCities.sortOrder, 0)))
+        .limit(1);
+    }
+    await db
+      .update(tripPlaces)
+      .set({ cityId: cityRows[0].id })
+      .where(and(eq(tripPlaces.tripId, tripId), isNull(tripPlaces.cityId)));
   }
   trip.cities = cityRows.map(toCityStop);
   if (!trip.cities.length) trip.cities = [fallbackCity(row)];

@@ -74,7 +74,7 @@ export const tripCities = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index("trip_cities_trip_sort_idx").on(table.tripId, table.sortOrder),
+    uniqueIndex("trip_cities_trip_sort_unique").on(table.tripId, table.sortOrder),
   ],
 );
 
