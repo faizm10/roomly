@@ -552,7 +552,7 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .map-controls { position: absolute; right: 14px; bottom: 28px; z-index: 12; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--ink); background: var(--paper); }
 .map-controls button { display: grid; width: 36px; height: 36px; padding: 0; place-items: center; border: 0; border-bottom: 1px solid var(--line); background: var(--paper); cursor: pointer; }
 .map-controls button:last-child { border-bottom: 0; }
-.mapbox-marker-with-preview { position: relative; z-index: 6; width: 34px; height: 34px; }
+.mapbox-marker-with-preview { z-index: 6; width: 34px; height: 34px; }
 .mapbox-marker-with-preview.preview-open { z-index: 16; }
 .mapbox-place-pin { display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 2px solid var(--paper); border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1px var(--ink); color: var(--paper); font-size: 8px; font-weight: 700; cursor: pointer; transition: transform 140ms ease; }
 .mapbox-place-pin:hover, .mapbox-place-pin:focus-visible { transform: scale(1.08); }
@@ -560,13 +560,15 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .place-map-popup { z-index: 18; }
 .place-map-popup .mapboxgl-popup-content { padding: 0; border: 1px solid var(--ink); border-radius: 0; background: var(--paper); box-shadow: 0 10px 28px rgba(17,17,17,.18); }
 .place-map-popup .mapboxgl-popup-tip { border-top-color: var(--ink); border-bottom-color: var(--ink); }
-.map-preview-card { display: grid; width: min(236px, calc(100vw - 34px)); min-height: 76px; padding: 10px; grid-template-columns: 46px 1fr; gap: 10px; align-items: center; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); pointer-events: none; text-align: left; }
+.map-preview-card { display: block; width: min(230px, calc(100vw - 34px)); min-height: 58px; padding: 10px 11px; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); pointer-events: auto; text-align: left; }
 .place-map-popup .map-preview-card { border: 0; }
-.map-preview-media { display: grid; width: 46px; height: 54px; place-items: center; border: 1px solid var(--line); font-size: 9px; font-weight: 750; letter-spacing: .08em; }
 .map-preview-copy { min-width: 0; }
-.map-preview-kicker { display: block; color: var(--muted); font-size: 8px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
-.map-preview-copy strong { display: block; margin-top: 4px; overflow: hidden; font-size: 15px; font-weight: 700; letter-spacing: -.03em; line-height: 1.05; text-overflow: ellipsis; white-space: nowrap; }
-.map-preview-copy small { display: -webkit-box; margin-top: 5px; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.map-preview-copy strong { display: block; overflow: hidden; font-size: 15px; font-weight: 700; letter-spacing: -.03em; line-height: 1.05; text-overflow: ellipsis; white-space: nowrap; }
+.map-preview-address { display: grid; margin-top: 7px; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
+.map-preview-address small { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.map-preview-address a { display: grid; width: 24px; height: 24px; flex: none; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--ink); text-decoration: none; }
+.map-preview-address a:hover, .map-preview-address a:focus-visible { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.map-preview-address svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
 .map-topbar { position: absolute; top: 16px; left: 16px; z-index: 14; }
 .route-button { display: inline-flex; min-height: 40px; padding: 0 14px; align-items: center; gap: 8px; border: 1px solid var(--ink); background: var(--paper); font-size: 11px; font-weight: 650; cursor: pointer; }
 .route-button.active { background: var(--ink); color: var(--paper); }
@@ -599,12 +601,12 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .park-b { top: 55%; right: 9%; width: 90px; height: 80px; transform: rotate(7deg); }
 .workspace-route { position: absolute; inset: 0; width: 100%; height: 100%; }
 .workspace-route path { fill: none; stroke: var(--ink); stroke-dasharray: 4 10; stroke-linecap: round; stroke-width: 5; }
-.workspace-pin { position: absolute; z-index: 5; padding: 0; border: 0; background: transparent; cursor: pointer; }
-.workspace-pin:hover, .workspace-pin:focus-visible { z-index: 18; }
-.workspace-pin > span:not(.map-preview-card) { display: grid; width: 34px; height: 34px; place-items: center; border: 2px solid var(--paper); border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1px var(--ink); color: var(--paper); font-size: 8px; font-weight: 700; }
-.workspace-pin.selected > span:not(.map-preview-card) { background: var(--paper); box-shadow: 0 0 0 2px var(--ink); color: var(--ink); }
+.workspace-pin { position: absolute; z-index: 5; }
+.workspace-pin:hover, .workspace-pin:focus-within { z-index: 18; }
+.workspace-pin-button { display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 2px solid var(--paper); border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1px var(--ink); color: var(--paper); font-size: 8px; font-weight: 700; cursor: pointer; }
+.workspace-pin.selected .workspace-pin-button { background: var(--paper); box-shadow: 0 0 0 2px var(--ink); color: var(--ink); }
 .workspace-pin .map-preview-card { position: absolute; top: 43px; left: 50%; z-index: 2; opacity: 0; transform: translate(-50%, -4px); transition: opacity 120ms ease, transform 120ms ease; visibility: hidden; }
-.workspace-pin:hover .map-preview-card, .workspace-pin:focus-visible .map-preview-card { opacity: 1; transform: translate(-50%, 0); visibility: visible; }
+.workspace-pin:hover .map-preview-card, .workspace-pin:focus-within .map-preview-card { opacity: 1; transform: translate(-50%, 0); visibility: visible; }
 .map-demo-label { position: absolute; left: 15px; bottom: 15px; padding: 6px 8px; border: 1px solid var(--line); background: var(--paper); color: var(--muted); font-size: 9px; }
 
 /* Dialogs and place search */
