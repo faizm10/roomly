@@ -40,4 +40,13 @@ describe("google viewports", () => {
       }),
     ).toEqual([-9.3, 38.6, -9.0, 38.8]);
   });
+
+  it("rejects administrative bounds that are too broad for a city map", () => {
+    expect(
+      viewportToBbox({
+        southwest: { lat: 20.4231216, lng: 136.0696826 },
+        northeast: { lat: 35.8984074, lng: 153.9867945 },
+      }),
+    ).toBeUndefined();
+  });
 });
