@@ -17,6 +17,29 @@ describe("google city predictions", () => {
       label: "Lisbon, Portugal",
       region: undefined,
       country: "Portugal",
+      kind: "city",
+    });
+  });
+
+  it("keeps a country as its own destination", () => {
+    expect(
+      cityFromGooglePrediction(
+        {
+          placeId: "ChIJcountry",
+          types: ["country", "political"],
+          structuredFormat: {
+            mainText: { text: "South Korea" },
+          },
+        },
+        "country",
+      ),
+    ).toEqual({
+      id: "ChIJcountry",
+      name: "South Korea",
+      label: "South Korea",
+      region: undefined,
+      country: "South Korea",
+      kind: "country",
     });
   });
 });

@@ -79,6 +79,7 @@ function addIsoDays(iso: string, days: number) {
 }
 
 function tripDates(startDate: string, endDate: string) {
+  if (!startDate || !endDate) return [];
   const dates: string[] = [];
   for (let date = startDate; date <= endDate && dates.length < 45; date = addIsoDays(date, 1)) {
     dates.push(date);
@@ -468,14 +469,14 @@ export function TripWorkspace({
             <button role="tab" aria-selected={workspaceMode === "day"} className={workspaceMode === "day" ? "active" : ""} onClick={() => setWorkspaceMode("day")} type="button"><CalendarDays size={14} /> Day plan</button>
           </div>
           <div className="city-strip" aria-label="City stops">
-            <button className={activeCityId === "all" ? "active" : ""} onClick={() => setActiveCityId("all")} type="button">All cities</button>
+            <button className={activeCityId === "all" ? "active" : ""} onClick={() => setActiveCityId("all")} type="button">All stops</button>
             {cities.map((city) => (
               <span className={`city-chip${activeCityId === city.id ? " active" : ""}`} key={city.id}>
                 <button onClick={() => setActiveCityId(city.id)} type="button">{city.name}</button>
                 {cities.length > 1 ? <button aria-label={`Remove ${city.name}`} onClick={() => removeCity(city.id)} type="button"><X size={12} /></button> : null}
               </span>
             ))}
-            <button className="city-add" onClick={() => setCityOpen(true)} type="button"><Plus size={13} /> City</button>
+            <button className="city-add" onClick={() => setCityOpen(true)} type="button"><Plus size={13} /> Stop</button>
           </div>
           <div className="collab-row">
             <div className="mini-avatars">
@@ -977,16 +978,16 @@ function AddCityDialog({
     const data = Object.fromEntries(new FormData(event.currentTarget));
     const destination = String(data.destination ?? "").trim();
     if (!destination) {
-      setError("Pick a city from the list.");
+      setError("Pick a city or country from the list.");
       return;
     }
-    const startDate = String(data.startDate ?? "") || details.startDate;
-    const endDate = String(data.endDate ?? "") || details.endDate;
-    if (endDate < startDate) {
+    const startDate = String(data.startDate ?? "");
+    const endDate = String(data.endDate ?? "");
+    if (startDate && endDate && endDate < startDate) {
       setError("The city end date must be after its start date.");
       return;
     }
-    onAdd({ ...parseCityStop(destination, details), startDate, endDate });
+    onAdd({ ...parseCityStop(destination, details), startDate: startDate || null, endDate: endDate || null });
     onClose();
   }
 
@@ -994,10 +995,10 @@ function AddCityDialog({
     <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="place-dialog logistics-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="city-title" tabIndex={-1}>
         <header>
-          <span className="dialog-step">City stop</span>
+          <span className="dialog-step">Trip stop</span>
           <button className="icon-button" onClick={onClose} aria-label="Close" type="button"><X size={20} /></button>
         </header>
-        <p className="eyebrow">Add another city</p>
+        <p className="eyebrow">Add another stop</p>
         <h2 id="city-title">Where else?</h2>
         <form className="new-trip-form" onSubmit={submit}>
           <CityField />
@@ -1005,8 +1006,9 @@ function AddCityDialog({
             <label><span>Arrive</span><input defaultValue={details.startDate} name="startDate" type="date" /></label>
             <label><span>Leave</span><input defaultValue={details.endDate} name="endDate" type="date" /></label>
           </div>
+          <p className="date-optional">Optional. Leave blank if this stop has no dates yet.</p>
           {error ? <p className="form-error" role="alert">{error}</p> : null}
-          <button className="button button-ink button-full" type="submit">Add city <MapPin size={17} /></button>
+          <button className="button button-ink button-full" type="submit">Add stop <MapPin size={17} /></button>
         </form>
       </section>
     </div>

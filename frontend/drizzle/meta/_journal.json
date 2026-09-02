@@ -43,6 +43,13 @@
       "when": 1788320833984,
       "tag": "0005_skinny_sentinels",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788338824141,
+      "tag": "0006_optional_trip_dates",
+      "breakpoints": true
     }
   ]
 }

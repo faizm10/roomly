@@ -1,6 +1,7 @@
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
-export function formatDateLabel(startDate: string, endDate: string) {
+export function formatDateLabel(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return "Dates later";
   const monthName = (iso: string) => months[Number(iso.slice(5, 7)) - 1] ?? "";
   const day = (iso: string) => String(Number(iso.slice(8, 10)));
   if (startDate.slice(0, 7) === endDate.slice(0, 7)) {

@@ -14,6 +14,7 @@ export function googleMapsConfigured() {
 type GoogleSuggestion = {
   placePrediction?: {
     placeId?: string;
+    types?: string[];
     text?: { text?: string };
     structuredFormat?: {
       mainText?: { text?: string };
@@ -32,7 +33,10 @@ type GooglePlace = {
   addressComponents?: Array<{ longText?: string; types?: string[] }>;
 };
 
-export function cityFromGooglePrediction(prediction: GoogleSuggestion["placePrediction"]): CitySuggestion | null {
+export function cityFromGooglePrediction(
+  prediction: GoogleSuggestion["placePrediction"],
+  kind?: CitySuggestion["kind"],
+): CitySuggestion | null {
   if (!prediction) return null;
   const name =
     prediction.structuredFormat?.mainText?.text?.trim() ||
@@ -42,12 +46,14 @@ export function cityFromGooglePrediction(prediction: GoogleSuggestion["placePred
   const parts = secondary.split(",").map((part) => part.trim()).filter(Boolean);
   const country = parts.at(-1);
   const region = parts.length > 1 ? parts[0] : undefined;
+  const isCountry = kind === "country" || prediction.types?.includes("country");
   return {
     id: prediction.placeId ?? name,
     name,
-    label: formatCityLabel({ name, region, country }),
-    region,
-    country,
+    label: isCountry ? name : formatCityLabel({ name, region, country }),
+    region: isCountry ? undefined : region,
+    country: isCountry ? name : country,
+    kind: isCountry ? "country" : "city",
   };
 }
 
@@ -131,17 +137,29 @@ export async function googleCitySuggestions(query: string): Promise<CitySuggesti
       }),
       cache: "no-store",
     });
-  let response = await request(["locality", "administrative_area_level_1"]);
-  if (!response.ok) response = await request(["locality"]);
-  if (!response.ok) return null;
-  const body = (await response.json()) as { suggestions?: GoogleSuggestion[] };
+  const [placesResponse, countryResponse] = await Promise.all([
+    request(["locality", "administrative_area_level_1"]).then((response) => (response.ok ? response : request(["locality"]))),
+    request(["country"]),
+  ]);
+  if (!placesResponse.ok && !countryResponse.ok) return null;
+  const [placesBody, countryBody] = await Promise.all([
+    placesResponse.ok ? (placesResponse.json() as Promise<{ suggestions?: GoogleSuggestion[] }>) : Promise.resolve({ suggestions: [] }),
+    countryResponse.ok ? (countryResponse.json() as Promise<{ suggestions?: GoogleSuggestion[] }>) : Promise.resolve({ suggestions: [] }),
+  ]);
   const results: CitySuggestion[] = [];
   const seen = new Set<string>();
-  for (const suggestion of body.suggestions ?? []) {
-    const city = cityFromGooglePrediction(suggestion.placePrediction);
-    if (!city || seen.has(city.label)) continue;
-    seen.add(city.label);
-    results.push(city);
+  for (const suggestion of countryBody.suggestions ?? []) {
+    const place = cityFromGooglePrediction(suggestion.placePrediction, "country");
+    if (!place || seen.has(place.label)) continue;
+    seen.add(place.label);
+    results.push(place);
+    if (results.length === 6) break;
+  }
+  for (const suggestion of placesBody.suggestions ?? []) {
+    const place = cityFromGooglePrediction(suggestion.placePrediction, "city");
+    if (!place || seen.has(place.label)) continue;
+    seen.add(place.label);
+    results.push(place);
     if (results.length === 6) break;
   }
   return results;

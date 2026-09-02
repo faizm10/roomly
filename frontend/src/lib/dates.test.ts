@@ -9,6 +9,11 @@ describe("trip dates", () => {
   it("keeps both months when the trip crosses them", () => {
     expect(formatDateLabel("2026-09-28", "2026-10-02")).toBe("SEP 28—OCT 2");
   });
+
+  it("leaves room for dates that are still open", () => {
+    expect(formatDateLabel("", "")).toBe("Dates later");
+    expect(formatDateLabel(undefined, undefined)).toBe("Dates later");
+  });
 });
 
 describe("destination country", () => {

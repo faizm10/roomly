@@ -84,7 +84,7 @@ export function CityField({
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
-        placeholder="Start typing a city"
+        placeholder="Start typing a city or country"
         role="combobox"
         required={!selected}
         spellCheck={false}
@@ -105,12 +105,12 @@ export function CityField({
                 type="button"
               >
                 <span>{city.name}</span>
-                <small>{city.country ?? city.region ?? city.label}</small>
+                <small>{city.kind === "country" ? "Country" : (city.country ?? city.region ?? city.label)}</small>
               </button>
             </li>
           ))}
           {!search.isFetching && !search.isError && results.length === 0 ? (
-            <li className="city-suggestion-state">No cities match that yet.</li>
+            <li className="city-suggestion-state">No cities or countries match that yet.</li>
           ) : null}
         </ul>
       ) : null}

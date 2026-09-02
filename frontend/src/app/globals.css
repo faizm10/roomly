@@ -641,6 +641,7 @@ input, select { min-height: 48px; padding: 0 13px; }
 textarea { padding: 12px 13px; line-height: 1.45; }
 input::placeholder, textarea::placeholder { color: #9b9b97; }
 .date-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.date-optional { margin: -6px 0 8px; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .form-error { margin: 0 0 16px; padding: 10px 12px; border-left: 2px solid var(--ink); background: var(--surface); font-size: 12px; }
 .form-footnote { margin: 14px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
 .auth-grid { width: 100%; }

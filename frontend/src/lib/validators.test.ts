@@ -17,6 +17,11 @@ import {
 } from "@/lib/validators";
 
 describe("trip validation", () => {
+  it("lets a trip be created without dates", () => {
+    const result = createTripSchema.safeParse({ title: "South Korea", destination: "South Korea" });
+    expect(result.success).toBe(true);
+  });
+
   it("rejects a trip whose return is before departure", () => {
     const result = createTripSchema.safeParse({ title: "A trip", destination: "Lisbon", startDate: "2026-09-18", endDate: "2026-09-12" });
     expect(result.success).toBe(false);

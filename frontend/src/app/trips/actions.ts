@@ -116,7 +116,13 @@ export async function createTrip(input: unknown) {
   if (!db) return { id: "lisbon-weekender", demo: true };
   const [trip] = await db
     .insert(trips)
-    .values({ ...data, ownerId: viewer.id })
+    .values({
+      title: data.title,
+      destination: data.destination,
+      startDate: optionalValue(data.startDate),
+      endDate: optionalValue(data.endDate),
+      ownerId: viewer.id,
+    })
     .returning({ id: trips.id });
   try {
     await db.insert(tripMembers).values({
@@ -135,8 +141,8 @@ export async function createTrip(input: unknown) {
       tripId: trip.id,
       name: data.destination.split(",")[0]?.trim() || data.destination,
       country: countryFromDestination(data.destination),
-      startDate: data.startDate,
-      endDate: data.endDate,
+      startDate: optionalValue(data.startDate),
+      endDate: optionalValue(data.endDate),
       sortOrder: 0,
     });
   } catch (error) {
@@ -607,7 +613,13 @@ export async function updateTrip(input: unknown) {
   const { tripId, ...details } = data;
   const [updated] = await db
     .update(trips)
-    .set({ ...details, updatedAt: new Date() })
+    .set({
+      title: details.title,
+      destination: details.destination,
+      startDate: optionalValue(details.startDate),
+      endDate: optionalValue(details.endDate),
+      updatedAt: new Date(),
+    })
     .where(eq(trips.id, tripId))
     .returning({ id: trips.id });
   if (!updated) throw new Error("This trip could not be updated.");

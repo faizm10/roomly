@@ -16,7 +16,7 @@ export function NewTripForm() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     if (!String(data.destination ?? "").trim()) {
-      setError("Pick a city from the list so the trip can be saved.");
+      setError("Pick a city or country from the list so the trip can be saved.");
       return;
     }
     const parsed = createTripSchema.safeParse(data);
@@ -47,13 +47,14 @@ export function NewTripForm() {
           <span>
             <CalendarDays size={15} /> Start
           </span>
-          <input name="startDate" required type="date" />
+          <input name="startDate" type="date" />
         </label>
         <label>
           <span>Come home</span>
-          <input name="endDate" required type="date" />
+          <input name="endDate" type="date" />
         </label>
       </div>
+      <p className="date-optional">Optional. Save the places first and add dates later.</p>
       {error ? (
         <p className="form-error" role="alert">
           {error}

@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   const endpoint = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`);
   endpoint.searchParams.set("access_token", token);
   endpoint.searchParams.set("autocomplete", "true");
-  endpoint.searchParams.set("types", "place,locality,region");
+  endpoint.searchParams.set("types", "place,locality,region,country");
   endpoint.searchParams.set("limit", "6");
   endpoint.searchParams.set("language", "en");
 
@@ -45,9 +45,10 @@ export async function GET(request: Request) {
   for (const feature of body.features ?? []) {
     const name = feature.text?.trim();
     if (!name) continue;
-    const region = contextPart(feature, "region.");
-    const country = contextPart(feature, "country.");
-    const label = formatCityLabel({ name, region, country });
+    const isCountry = feature.id?.startsWith("country.");
+    const region = isCountry ? undefined : contextPart(feature, "region.");
+    const country = isCountry ? name : contextPart(feature, "country.");
+    const label = isCountry ? name : formatCityLabel({ name, region, country });
     if (seen.has(label)) continue;
     seen.add(label);
     results.push({
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
       label,
       region,
       country,
+      kind: isCountry ? "country" : "city",
       coordinates: feature.center,
     });
   }

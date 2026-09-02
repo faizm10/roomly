@@ -64,14 +64,14 @@ function toCityStop(row: {
   };
 }
 
-function fallbackCity(row: { id: string; destination: string; startDate: string | Date; endDate: string | Date }): CityStop {
+function fallbackCity(row: { id: string; destination: string; startDate?: string | Date | null; endDate?: string | Date | null }): CityStop {
   const destination = destinationParts(row.destination);
   return {
     id: `${row.id}-primary-city`,
     name: destination.name,
     country: destination.country,
-    startDate: asIsoDate(row.startDate),
-    endDate: asIsoDate(row.endDate),
+    startDate: row.startDate ? asIsoDate(row.startDate) : null,
+    endDate: row.endDate ? asIsoDate(row.endDate) : null,
     sortOrder: 0,
   };
 }
@@ -86,15 +86,15 @@ function toTrip(row: {
   id: string;
   title: string;
   destination: string;
-  startDate: string | Date;
-  endDate: string | Date;
+  startDate: string | Date | null;
+  endDate: string | Date | null;
   placeCount?: number;
   cities?: CityStop[];
   dayNotes?: DayNote[];
   collaborators?: Collaborator[];
 }): Trip {
-  const startDate = asIsoDate(row.startDate);
-  const endDate = asIsoDate(row.endDate);
+  const startDate = row.startDate ? asIsoDate(row.startDate) : "";
+  const endDate = row.endDate ? asIsoDate(row.endDate) : "";
   const placeCount = Math.max(0, Number(row.placeCount ?? 0));
   const cities = row.cities?.length ? row.cities : [fallbackCity(row)];
   return {
@@ -283,8 +283,8 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
           tripId,
           name: destination.name,
           country: destination.country,
-          startDate: asIsoDate(row.startDate),
-          endDate: asIsoDate(row.endDate),
+          startDate: row.startDate ? asIsoDate(row.startDate) : null,
+          endDate: row.endDate ? asIsoDate(row.endDate) : null,
           sortOrder: 0,
         })
         .returning({

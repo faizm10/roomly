@@ -36,7 +36,7 @@ export function TripLogisticsDialog({
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     if (!String(data.destination ?? "").trim()) {
-      setError("Pick a city from the list so the trip can be saved.");
+      setError("Pick a city or country from the list so the trip can be saved.");
       return;
     }
     const parsed = createTripSchema.safeParse(data);
@@ -48,8 +48,8 @@ export function TripLogisticsDialog({
       title: parsed.data.title,
       destination: parsed.data.destination,
       country: countryFromDestination(parsed.data.destination),
-      startDate: parsed.data.startDate,
-      endDate: parsed.data.endDate,
+      startDate: parsed.data.startDate || "",
+      endDate: parsed.data.endDate || "",
       dateLabel: formatDateLabel(parsed.data.startDate, parsed.data.endDate),
     };
     const persistable = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trip.id);
@@ -99,13 +99,14 @@ export function TripLogisticsDialog({
               <span>
                 <CalendarDays size={15} /> Start
               </span>
-              <input defaultValue={trip.startDate} name="startDate" required type="date" />
+              <input defaultValue={trip.startDate} name="startDate" type="date" />
             </label>
             <label>
               <span>Come home</span>
-              <input defaultValue={trip.endDate} name="endDate" required type="date" />
+              <input defaultValue={trip.endDate} name="endDate" type="date" />
             </label>
           </div>
+          <p className="date-optional">Optional. Leave blank if the dates are still open.</p>
           {error ? (
             <p className="form-error" role="alert">
               {error}

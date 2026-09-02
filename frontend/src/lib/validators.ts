@@ -1,29 +1,32 @@
 import { z } from "zod";
 import { PLACE_CATEGORIES } from "@/lib/types";
 
+const optionalIsoDate = z.iso.date().optional().or(z.literal(""));
+
 const tripDetailsFields = {
   title: z.string().trim().min(2).max(80),
   destination: z.string().trim().min(2).max(100),
-  startDate: z.iso.date(),
-  endDate: z.iso.date(),
+  startDate: optionalIsoDate,
+  endDate: optionalIsoDate,
 };
 
-function withReturnAfterStart<T extends z.ZodRawShape>(shape: T) {
+function withOptionalReturnAfterStart<T extends z.ZodRawShape>(shape: T) {
   return z.object(shape).refine(
     (data) => {
-      const dates = data as { startDate: string; endDate: string };
+      const dates = data as { startDate?: string; endDate?: string };
+      if (!dates.startDate || !dates.endDate) return true;
       return dates.endDate >= dates.startDate;
     },
     {
-      message: "The return date must be after the start date.",
+      message: "The end date must be after the start date.",
       path: ["endDate"],
     },
   );
 }
 
-export const createTripSchema = withReturnAfterStart(tripDetailsFields);
+export const createTripSchema = withOptionalReturnAfterStart(tripDetailsFields);
 
-export const updateTripSchema = withReturnAfterStart({
+export const updateTripSchema = withOptionalReturnAfterStart({
   tripId: z.string().uuid(),
   ...tripDetailsFields,
 });
@@ -44,22 +47,6 @@ export const addPlaceSchema = z.object({
   plannedDate: z.iso.date().optional().or(z.literal("")),
   daySortOrder: z.number().int().min(0).optional(),
 });
-
-const optionalIsoDate = z.iso.date().optional().or(z.literal(""));
-
-function withOptionalReturnAfterStart<T extends z.ZodRawShape>(shape: T) {
-  return z.object(shape).refine(
-    (data) => {
-      const dates = data as { startDate?: string; endDate?: string };
-      if (!dates.startDate || !dates.endDate) return true;
-      return dates.endDate >= dates.startDate;
-    },
-    {
-      message: "The end date must be after the start date.",
-      path: ["endDate"],
-    },
-  );
-}
 
 export const addTripCitySchema = withOptionalReturnAfterStart({
   tripId: z.string().uuid(),

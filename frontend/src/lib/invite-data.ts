@@ -131,7 +131,10 @@ export async function getInvitePreview(
       id: trip.id,
       title: trip.title,
       destination: trip.destination,
-      dateLabel: formatDateLabel(trip.startDate, trip.endDate),
+      dateLabel: formatDateLabel(
+        trip.startDate ? String(trip.startDate).slice(0, 10) : "",
+        trip.endDate ? String(trip.endDate).slice(0, 10) : "",
+      ),
     },
     viewerAlreadyMember,
     viewerEmailMismatch,
