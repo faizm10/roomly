@@ -3,7 +3,7 @@
 import { LocateFixed, Minus, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CityLocation } from "@/lib/cities";
-import type { Place } from "@/lib/types";
+import { categoryClass, type Place } from "@/lib/types";
 
 const FALLBACK_CENTER: [number, number] = [-9.1393, 38.7139];
 
@@ -42,11 +42,55 @@ function showCity(map: import("mapbox-gl").Map, location: CityLocation, animate:
   map.jumpTo({ center: location.coordinates, zoom: 12 });
 }
 
+function previewSubtitle(place: Place) {
+  return place.neighborhood || place.address || "Saved place";
+}
+
+function createPreviewCard(place: Place, index: number) {
+  const card = document.createElement("div");
+  card.className = "map-preview-card";
+
+  const media = document.createElement("span");
+  media.className = `map-preview-media ${categoryClass(place.category)}`;
+  media.textContent = place.category.slice(0, 2).toUpperCase();
+
+  const copy = document.createElement("span");
+  copy.className = "map-preview-copy";
+
+  const kicker = document.createElement("span");
+  kicker.className = "map-preview-kicker";
+  kicker.textContent = `${String(index + 1).padStart(2, "0")} · ${place.category}`;
+
+  const title = document.createElement("strong");
+  title.textContent = place.name;
+
+  const subtitle = document.createElement("small");
+  subtitle.textContent = previewSubtitle(place);
+
+  copy.append(kicker, title, subtitle);
+  card.append(media, copy);
+  return card;
+}
+
+function MapPlacePreview({ place, number }: { place: Place; number: string }) {
+  return (
+    <span className="map-preview-card" aria-hidden="true">
+      <span className={`map-preview-media ${categoryClass(place.category)}`}>{place.category.slice(0, 2).toUpperCase()}</span>
+      <span className="map-preview-copy">
+        <span className="map-preview-kicker">{number} · {place.category}</span>
+        <strong>{place.name}</strong>
+        <small>{previewSubtitle(place)}</small>
+      </span>
+    </span>
+  );
+}
+
 export function TripMap({ destination, places, selectedId, routeActive, mapToken, onSelect }: TripMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("mapbox-gl").Map | null>(null);
   const mapboxRef = useRef<typeof import("mapbox-gl").default | null>(null);
   const markersRef = useRef<Map<string, import("mapbox-gl").Marker>>(new Map());
+  const popupsRef = useRef<Map<string, import("mapbox-gl").Popup>>(new Map());
   const shownDestinationRef = useRef("");
   const initialDestinationRef = useRef(destination);
   const [mapReady, setMapReady] = useState(false);
@@ -55,6 +99,7 @@ export function TripMap({ destination, places, selectedId, routeActive, mapToken
     if (!mapToken || !containerRef.current) return;
     let active = true;
     const markerMap = markersRef.current;
+    const popupMap = popupsRef.current;
     const openingDestination = initialDestinationRef.current;
 
     async function mountMap() {
@@ -85,6 +130,8 @@ export function TripMap({ destination, places, selectedId, routeActive, mapToken
     mountMap();
     return () => {
       active = false;
+      popupMap.forEach((popup) => popup.remove());
+      popupMap.clear();
       markerMap.forEach((marker) => marker.remove());
       markerMap.clear();
       mapRef.current?.remove();
@@ -114,17 +161,43 @@ export function TripMap({ destination, places, selectedId, routeActive, mapToken
     const mapboxgl = mapboxRef.current;
     if (!mapReady || !map || !mapboxgl) return;
 
+    popupsRef.current.forEach((popup) => popup.remove());
+    popupsRef.current.clear();
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current.clear();
     for (const [index, place] of places.entries()) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "mapbox-marker-with-preview";
       const element = document.createElement("button");
       element.className = `mapbox-place-pin${place.id === selectedId ? " selected" : ""}`;
       element.type = "button";
-      element.ariaLabel = `Select ${place.name}`;
+      element.ariaLabel = `Select ${place.name}, ${place.category}, ${previewSubtitle(place)}`;
       element.textContent = String(index + 1).padStart(2, "0");
       element.addEventListener("click", () => onSelect(place.id));
-      const marker = new mapboxgl.Marker({ element, anchor: "bottom" }).setLngLat(place.coordinates).addTo(map);
+      wrapper.append(element);
+      const popup = new mapboxgl.Popup({
+        className: "place-map-popup",
+        closeButton: false,
+        closeOnClick: false,
+        focusAfterOpen: false,
+        maxWidth: "260px",
+        offset: 18,
+      }).setDOMContent(createPreviewCard(place, index));
+      const showPreview = () => {
+        wrapper.classList.add("preview-open");
+        popup.setLngLat(place.coordinates).addTo(map);
+      };
+      const hidePreview = () => {
+        wrapper.classList.remove("preview-open");
+        popup.remove();
+      };
+      element.addEventListener("mouseenter", showPreview);
+      element.addEventListener("focus", showPreview);
+      element.addEventListener("mouseleave", hidePreview);
+      element.addEventListener("blur", hidePreview);
+      const marker = new mapboxgl.Marker({ element: wrapper, anchor: "bottom" }).setLngLat(place.coordinates).addTo(map);
       markersRef.current.set(place.id, marker);
+      popupsRef.current.set(place.id, popup);
     }
 
     const source = map.getSource("trip-route") as import("mapbox-gl").GeoJSONSource | undefined;
@@ -181,19 +254,22 @@ export function TripMap({ destination, places, selectedId, routeActive, mapToken
           <path d="M630 420 C 510 340, 270 235, 350 168 S 460 335, 440 350 S 650 175, 780 252 S 445 620, 260 532" />
         </svg>
       )}
-      {places.map((place, index) => (
-        <button
-          className={`workspace-pin${selectedId === place.id ? " selected" : ""}`}
-          style={positions[index % positions.length]}
-          key={place.id}
-          onClick={() => onSelect(place.id)}
-          aria-label={`Select ${place.name}`}
-          type="button"
-        >
-          <span>{String(index + 1).padStart(2, "0")}</span>
-          {selectedId === place.id && <small>{place.name}</small>}
-        </button>
-      ))}
+      {places.map((place, index) => {
+        const number = String(index + 1).padStart(2, "0");
+        return (
+          <button
+            className={`workspace-pin${selectedId === place.id ? " selected" : ""}`}
+            style={positions[index % positions.length]}
+            key={place.id}
+            onClick={() => onSelect(place.id)}
+            aria-label={`Select ${place.name}, ${place.category}, ${previewSubtitle(place)}`}
+            type="button"
+          >
+            <span>{number}</span>
+            <MapPlacePreview place={place} number={number} />
+          </button>
+        );
+      })}
       <div className="map-demo-label">Map preview · {destination || "Add a Mapbox key for live tiles"}</div>
       <div className="map-controls"><button type="button" aria-label="Zoom in"><Plus size={17} /></button><button type="button" aria-label="Zoom out"><Minus size={17} /></button><button type="button" aria-label="Find me"><LocateFixed size={17} /></button></div>
     </div>
