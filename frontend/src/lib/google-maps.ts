@@ -1,6 +1,8 @@
 import { formatCityLabel, type CityLocation, type CitySuggestion } from "@/lib/cities";
 import type { PlaceCategory, PlaceSearchResult } from "@/lib/types";
 
+const MAX_CITY_BBOX_SPAN_DEGREES = 4;
+
 export function getGoogleMapsKey() {
   return process.env.GOOGLE_MAPS_API_KEY?.trim() || "";
 }
@@ -85,13 +87,31 @@ export function viewportToBbox(viewport?: {
   southwest?: { lat?: number; lng?: number };
   northeast?: { lat?: number; lng?: number };
 }): CityLocation["bbox"] | undefined {
-  if (viewport?.low && viewport?.high && typeof viewport.low.longitude === "number" && typeof viewport.high.longitude === "number") {
-    return [viewport.low.longitude, viewport.low.latitude ?? 0, viewport.high.longitude, viewport.high.latitude ?? 0];
+  let bbox: CityLocation["bbox"] | undefined;
+  if (
+    viewport?.low &&
+    viewport?.high &&
+    typeof viewport.low.longitude === "number" &&
+    typeof viewport.low.latitude === "number" &&
+    typeof viewport.high.longitude === "number" &&
+    typeof viewport.high.latitude === "number"
+  ) {
+    bbox = [viewport.low.longitude, viewport.low.latitude, viewport.high.longitude, viewport.high.latitude];
+  } else if (
+    viewport?.southwest &&
+    viewport?.northeast &&
+    typeof viewport.southwest.lng === "number" &&
+    typeof viewport.southwest.lat === "number" &&
+    typeof viewport.northeast.lng === "number" &&
+    typeof viewport.northeast.lat === "number"
+  ) {
+    bbox = [viewport.southwest.lng, viewport.southwest.lat, viewport.northeast.lng, viewport.northeast.lat];
   }
-  if (viewport?.southwest && viewport?.northeast && typeof viewport.southwest.lng === "number" && typeof viewport.northeast.lng === "number") {
-    return [viewport.southwest.lng, viewport.southwest.lat ?? 0, viewport.northeast.lng, viewport.northeast.lat ?? 0];
-  }
-  return undefined;
+  if (!bbox) return undefined;
+  const longitudeSpan = Math.abs(bbox[2] - bbox[0]);
+  const latitudeSpan = Math.abs(bbox[3] - bbox[1]);
+  if (longitudeSpan > MAX_CITY_BBOX_SPAN_DEGREES || latitudeSpan > MAX_CITY_BBOX_SPAN_DEGREES) return undefined;
+  return bbox;
 }
 
 export async function googleCitySuggestions(query: string): Promise<CitySuggestion[] | null> {
@@ -150,7 +170,7 @@ export async function googleGeocode(query: string): Promise<CityLocation | null>
   if (body.status !== "OK" || typeof location?.lng !== "number" || typeof location.lat !== "number") return null;
   return {
     coordinates: [location.lng, location.lat],
-    bbox: viewportToBbox(result?.geometry?.bounds ?? result?.geometry?.viewport),
+    bbox: viewportToBbox(result?.geometry?.bounds) ?? viewportToBbox(result?.geometry?.viewport),
   };
 }
 
