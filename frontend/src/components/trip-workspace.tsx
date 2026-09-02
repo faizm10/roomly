@@ -484,7 +484,7 @@ export function TripWorkspace({
                 <ProfileAvatar image={person.image} key={person.id ?? person.name} name={person.name} size="xs" />
               ))}
             </div>
-            <span className="planning-count">{planners.length} {planners.length === 1 ? "planner" : "planning"}</span>
+            <span className="planning-count">{planners.length} {planners.length === 1 ? "planner" : "planners"}</span>
             {saveState !== "idle" ? (
               <span className={`save-status${saveState === "error" ? " error" : ""}`} aria-live="polite">
                 {saveState === "saving" ? "Saving" : saveState === "saved" ? "Saved" : "Couldn’t save"}
@@ -558,10 +558,12 @@ export function TripWorkspace({
               cities={cities}
               dates={itineraryDates}
               dayNotes={dayNotes}
+              filter={filter}
               onAddNote={addNote}
               onFocusDate={setActiveDate}
               onRemoveNote={removeNote}
               onSelectPlace={selectPlace}
+              onToggleSaved={toggleSaved}
               onUpdateNote={updateNote}
               onUpdatePlanning={updatePlanning}
               places={places}
@@ -664,10 +666,12 @@ function DayPlan({
   cities,
   dates,
   dayNotes,
+  filter,
   onAddNote,
   onFocusDate,
   onRemoveNote,
   onSelectPlace,
+  onToggleSaved,
   onUpdateNote,
   onUpdatePlanning,
   places,
@@ -678,22 +682,29 @@ function DayPlan({
   cities: CityStop[];
   dates: string[];
   dayNotes: DayNote[];
+  filter: PlaceCategory | "All";
   onAddNote: (plannedDate: string, note: string, cityId: string) => void;
   onFocusDate: (plannedDate: string | null) => void;
   onRemoveNote: (noteId: string) => void;
   onSelectPlace: (placeId: string) => void;
+  onToggleSaved: (placeId: string) => void;
   onUpdateNote: (noteId: string, note: string) => void;
   onUpdatePlanning: (placeId: string, plannedDate: string, cityId: string) => void;
   places: Place[];
   selectedId: string;
 }) {
   const cityMatches = (cityId?: string | null) => activeCityId === "all" || cityId === activeCityId;
-  const unplannedPlaces = places.filter((place) => !place.plannedDate && cityMatches(place.cityId));
+  const categoryMatches = (category: PlaceCategory) => filter === "All" || category === filter;
+  const unplannedPlaces = places.filter((place) => !place.plannedDate && cityMatches(place.cityId) && categoryMatches(place.category));
+  const plannedCount = places.filter((place) => place.plannedDate && cityMatches(place.cityId) && categoryMatches(place.category)).length;
 
   return (
     <div className="day-plan">
       <div className="day-plan-intro">
-        <p className="eyebrow">Day plan</p>
+        <div>
+          <p className="eyebrow">Day plan</p>
+          <strong>{plannedCount} planned · {dates.length} {dates.length === 1 ? "day" : "days"}</strong>
+        </div>
         <button className={!activeDate ? "active" : ""} onClick={() => onFocusDate(null)} type="button">Map all days</button>
       </div>
       {dates.map((date, index) => {
@@ -702,7 +713,7 @@ function DayPlan({
           .filter((note) => note.plannedDate === date && cityMatches(note.cityId))
           .sort((left, right) => left.sortOrder - right.sortOrder);
         const dayPlaces = places
-          .filter((place) => place.plannedDate === date && cityMatches(place.cityId))
+          .filter((place) => place.plannedDate === date && cityMatches(place.cityId) && categoryMatches(place.category))
           .sort((left, right) => (left.daySortOrder ?? 0) - (right.daySortOrder ?? 0));
         return (
           <section className={`day-section${activeDate === date ? " active" : ""}`} key={date}>
@@ -720,15 +731,22 @@ function DayPlan({
               <NoteComposer activeCityId={activeCityId} cities={cities} onAdd={(note, cityId) => onAddNote(date, note, cityId)} />
             </div>
             <div className="day-place-list">
-              {dayPlaces.map((place) => (
-                <article className={`day-place${selectedId === place.id ? " selected" : ""}`} key={place.id}>
-                  <button onClick={() => onSelectPlace(place.id)} type="button">
-                    <strong>{place.name}</strong>
-                    <small>{place.neighborhood || place.address}</small>
-                  </button>
-                  <PlanningControls cities={cities} dates={dates} onChange={onUpdatePlanning} place={place} />
-                </article>
-              ))}
+              {dayPlaces.map((place, placeIndex) => {
+                const number = String(placeIndex + 1).padStart(2, "0");
+                return (
+                  <DayPlaceRow
+                    cities={cities}
+                    dates={dates}
+                    key={place.id}
+                    number={number}
+                    onSelect={onSelectPlace}
+                    onToggleSaved={onToggleSaved}
+                    onUpdatePlanning={onUpdatePlanning}
+                    place={place}
+                    selected={selectedId === place.id}
+                  />
+                );
+              })}
               {!dayPlaces.length ? <p className="day-empty">No places planned for this day yet.</p> : null}
             </div>
           </section>
@@ -737,18 +755,94 @@ function DayPlan({
       {unplannedPlaces.length ? (
         <section className="day-section unplanned-section">
           <header><div><span>Unscheduled</span><h2>Saved for later</h2></div></header>
-          {unplannedPlaces.map((place) => (
-            <article className="day-place" key={place.id}>
-              <button onClick={() => onSelectPlace(place.id)} type="button">
-                <strong>{place.name}</strong>
-                <small>{place.neighborhood || place.address}</small>
-              </button>
-              <PlanningControls cities={cities} dates={dates} onChange={onUpdatePlanning} place={place} />
-            </article>
-          ))}
+          <div className="day-place-list">
+            {unplannedPlaces.map((place, placeIndex) => {
+              const number = String(placeIndex + 1).padStart(2, "0");
+              return (
+                <DayPlaceRow
+                  cities={cities}
+                  dates={dates}
+                  key={place.id}
+                  number={number}
+                  onSelect={onSelectPlace}
+                  onToggleSaved={onToggleSaved}
+                  onUpdatePlanning={onUpdatePlanning}
+                  place={place}
+                  selected={selectedId === place.id}
+                />
+              );
+            })}
+          </div>
         </section>
       ) : null}
     </div>
+  );
+}
+
+function DayPlaceRow({
+  cities,
+  dates,
+  number,
+  onSelect,
+  onToggleSaved,
+  onUpdatePlanning,
+  place,
+  selected,
+}: {
+  cities: CityStop[];
+  dates: string[];
+  number: string;
+  onSelect: (placeId: string) => void;
+  onToggleSaved: (placeId: string) => void;
+  onUpdatePlanning: (placeId: string, plannedDate: string, cityId: string) => void;
+  place: Place;
+  selected: boolean;
+}) {
+  const cityName = place.cityId ? cities.find((city) => city.id === place.cityId)?.name : null;
+
+  return (
+    <article
+      className={`day-place${selected ? " selected" : ""}`}
+      id={`day-place-${place.id}`}
+      onClick={() => onSelect(place.id)}
+      onKeyDown={(event) => {
+        if (event.currentTarget !== event.target) return;
+        if (event.key === "Enter" || event.key === " ") onSelect(place.id);
+      }}
+      tabIndex={0}
+      aria-label={`Show ${place.name} on the map`}
+    >
+      <div className="itinerary-rail"><span>{number}</span><i /></div>
+      <PlacePhoto fsqPlaceId={place.fsqPlaceId} name={place.name} label={place.category} />
+      <div className="saved-place-copy">
+        <p className="place-kicker">
+          <span className={`category-tag ${categoryClass(place.category)}`}>{place.category}</span>
+          {cityName ? <span className="place-hood">{cityName}</span> : null}
+        </p>
+        <h2>{place.name}</h2>
+        <small className="place-address">
+          {place.address}
+          <a
+            href={buildGoogleMapsPlaceUrl(place)}
+            aria-label={`Open ${place.name} in Google Maps`}
+            onClick={(event) => event.stopPropagation()}
+            rel="noreferrer"
+            target="_blank"
+          >
+            🗺️
+          </a>
+        </small>
+        <p className="place-note">{place.note || "No note yet. Add the detail that made this place worth saving."}</p>
+        <PlanningControls cities={cities} dates={dates} onChange={onUpdatePlanning} place={place} />
+        <div className="place-actions">
+          <span className="contributor">Added by {place.addedBy}</span>
+          {place.sourceUrl ? <a href={place.sourceUrl} onClick={(event) => event.stopPropagation()} target="_blank" rel="noreferrer">Original source <ExternalLink size={13} /></a> : null}
+        </div>
+      </div>
+      <div className="place-row-controls">
+        <button className="save-button" onClick={(event) => { event.stopPropagation(); onToggleSaved(place.id); }} aria-label={place.saved ? `Unsave ${place.name}` : `Save ${place.name}`} type="button"><Bookmark size={18} fill={place.saved ? "currentColor" : "none"} /></button>
+      </div>
+    </article>
   );
 }
 
