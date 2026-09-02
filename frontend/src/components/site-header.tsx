@@ -13,8 +13,8 @@ export async function SiteHeader() {
     <header className="site-header">
       <Logo />
       <nav className="site-nav" aria-label="Main navigation">
-        <a href="#method">How it works</a>
-        <a href="#map-first">Map first</a>
+        <a href="#stages">How it works</a>
+        <Link href="/trips/lisbon-weekender">Example trip</Link>
       </nav>
       <div className="site-actions">
         {signedIn ? (
