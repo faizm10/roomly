@@ -175,9 +175,14 @@ export async function addPlace(input: unknown) {
       sortOrder: Number(order?.next ?? 0),
       addedBy: viewer.id,
     };
+    const planningValues = {
+      cityId: optionalValue(data.cityId),
+      plannedDate: optionalValue(data.plannedDate),
+      daySortOrder: data.plannedDate ? data.daySortOrder ?? 0 : 0,
+    };
     const [saved] = await db
       .insert(tripPlaces)
-      .values({ ...values, cityId: optionalValue(data.cityId) })
+      .values({ ...values, ...planningValues })
       .returning({ id: tripPlaces.id })
       .catch(async (error) => {
         if (!isPlanningSchemaMissing(error)) throw error;

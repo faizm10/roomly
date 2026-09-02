@@ -1,21 +1,29 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, MapPin, Search, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PLACE_CATEGORIES, categoryClass, type Place, type PlaceCategory, type PlaceSearchResult } from "@/lib/types";
 
 type AddPlaceDialogProps = {
   destination: string;
+  initialPlannedDate?: string | null;
+  dates?: string[];
   onAdd: (place: Place) => void;
   onClose: () => void;
 };
 
-export function AddPlaceDialog({ destination, onAdd, onClose }: AddPlaceDialogProps) {
+function formatSaveDay(iso: string, index: number) {
+  const date = new Date(`${iso}T00:00:00.000Z`);
+  return `Day ${index + 1} · ${date.toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" })}`;
+}
+
+export function AddPlaceDialog({ destination, initialPlannedDate, dates = [], onAdd, onClose }: AddPlaceDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<PlaceSearchResult | null>(null);
   const [category, setCategory] = useState<PlaceCategory>("Other");
+  const [plannedDate, setPlannedDate] = useState(initialPlannedDate && dates.includes(initialPlannedDate) ? initialPlannedDate : "");
   const [note, setNote] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
 
@@ -50,6 +58,8 @@ export function AddPlaceDialog({ destination, onAdd, onClose }: AddPlaceDialogPr
       note,
       sourceUrl: sourceUrl || undefined,
       saved: true,
+      plannedDate: plannedDate || null,
+      daySortOrder: 0,
       addedBy: "FM",
     });
     onClose();
@@ -103,6 +113,16 @@ export function AddPlaceDialog({ destination, onAdd, onClose }: AddPlaceDialogPr
               </div>
             </div>
             <label className="field-label"><span>Your note</span><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Why did you save this? What should the group know?" rows={4} maxLength={500} /></label>
+            <label className="field-label">
+              <span>Plan day <small>(optional)</small></span>
+              <div className="day-select-input">
+                <CalendarDays size={16} />
+                <select value={plannedDate} onChange={(event) => setPlannedDate(event.target.value)} aria-label="Optional planned day">
+                  <option value="">Save without a day</option>
+                  {dates.map((date, index) => <option value={date} key={date}>{formatSaveDay(date, index)}</option>)}
+                </select>
+              </div>
+            </label>
             <label className="field-label"><span>Where you found it <small>(optional)</small></span><div className="url-input"><ExternalLink size={16} /><input type="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="Instagram, TikTok, article…" /></div></label>
             <button className="button button-ink button-full" onClick={save} type="button">Save to trip <MapPin size={17} /></button>
           </>

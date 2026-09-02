@@ -41,6 +41,8 @@ export const addPlaceSchema = z.object({
   note: z.string().trim().max(500).default(""),
   sourceUrl: z.url().optional().or(z.literal("")),
   saved: z.boolean().default(true),
+  plannedDate: z.iso.date().optional().or(z.literal("")),
+  daySortOrder: z.number().int().min(0).optional(),
 });
 
 const optionalIsoDate = z.iso.date().optional().or(z.literal(""));

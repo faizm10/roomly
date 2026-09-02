@@ -217,7 +217,11 @@ export function TripWorkspace({
 
   function addPlace(place: Place) {
     const cityId = selectedCity?.id ?? null;
-    const next = { ...place, cityId, addedBy: viewer?.name || place.addedBy, saved: true };
+    const plannedDate = place.plannedDate ?? null;
+    const daySortOrder = plannedDate
+      ? places.filter((item) => item.plannedDate === plannedDate && item.cityId === cityId).length
+      : 0;
+    const next = { ...place, cityId, plannedDate, daySortOrder, addedBy: viewer?.name || place.addedBy, saved: true };
     setPlaces((current) => [...current, next]);
     setSelectedId(next.id);
     setFilter("All");
@@ -238,6 +242,8 @@ export function TripWorkspace({
           note: next.note,
           sourceUrl: next.sourceUrl ?? "",
           saved: true,
+          plannedDate: next.plannedDate ?? "",
+          daySortOrder: next.daySortOrder ?? 0,
         });
         if (!("id" in saved) || !saved.id) return;
         persistedIds.current.set(next.id, saved.id);
@@ -590,7 +596,15 @@ export function TripWorkspace({
       </section>
 
       <button className="mobile-add-button" onClick={() => setAddOpen(true)} aria-label="Add a place" type="button"><Plus size={22} /></button>
-      {addOpen ? <AddPlaceDialog destination={selectedCity?.name ?? details.destination} onAdd={addPlace} onClose={() => setAddOpen(false)} /> : null}
+      {addOpen ? (
+        <AddPlaceDialog
+          dates={itineraryDates}
+          destination={selectedCity?.name ?? details.destination}
+          initialPlannedDate={workspaceMode === "day" ? activeDate : null}
+          onAdd={addPlace}
+          onClose={() => setAddOpen(false)}
+        />
+      ) : null}
       {cityOpen ? <AddCityDialog details={details} onAdd={addCity} onClose={() => setCityOpen(false)} /> : null}
       {inviteOpen ? <InviteDialog demo={!persistable} onClose={() => setInviteOpen(false)} tripId={trip.id} /> : null}
       {logisticsOpen ? (
@@ -691,6 +705,32 @@ function DayPlan({
   const categoryMatches = (category: PlaceCategory) => filter === "All" || category === filter;
   const unplannedPlaces = places.filter((place) => !place.plannedDate && cityMatches(place.cityId) && categoryMatches(place.category));
   const plannedCount = places.filter((place) => place.plannedDate && cityMatches(place.cityId) && categoryMatches(place.category)).length;
+  const hasUnplannedPage = unplannedPlaces.length > 0;
+  const totalPages = dates.length + (hasUnplannedPage ? 1 : 0);
+  const [pageIndex, setPageIndex] = useState(() => Math.max(0, activeDate ? dates.indexOf(activeDate) : 0));
+  const clampedPageIndex = Math.min(pageIndex, Math.max(0, totalPages - 1));
+  const currentDate = clampedPageIndex < dates.length ? dates[clampedPageIndex] : null;
+  const label = currentDate ? formatDayHeading(currentDate, clampedPageIndex) : null;
+  const notes = currentDate
+    ? dayNotes
+      .filter((note) => note.plannedDate === currentDate && cityMatches(note.cityId))
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+    : [];
+  const dayPlaces = currentDate
+    ? places
+      .filter((place) => place.plannedDate === currentDate && cityMatches(place.cityId) && categoryMatches(place.category))
+      .sort((left, right) => (left.daySortOrder ?? 0) - (right.daySortOrder ?? 0))
+    : unplannedPlaces;
+
+  function movePage(delta: number) {
+    const nextIndex = Math.min(Math.max(clampedPageIndex + delta, 0), Math.max(0, totalPages - 1));
+    setPageIndex(nextIndex);
+    onFocusDate(dates[nextIndex] ?? null);
+  }
+
+  function showCurrentDateOnMap() {
+    if (currentDate) onFocusDate(activeDate === currentDate ? null : currentDate);
+  }
 
   return (
     <div className="day-plan">
@@ -699,58 +739,57 @@ function DayPlan({
           <p className="eyebrow">Day plan</p>
           <strong>{plannedCount} planned · {dates.length} {dates.length === 1 ? "day" : "days"}</strong>
         </div>
-        <button className={!activeDate ? "active" : ""} onClick={() => onFocusDate(null)} type="button">Map all days</button>
+        <div className="day-pagination" aria-label="Day pages">
+          <button onClick={() => movePage(-1)} disabled={clampedPageIndex === 0} type="button">Prev</button>
+          <span>{currentDate ? `${label?.day} of ${dates.length}` : "Saved for later"}</span>
+          <button onClick={() => movePage(1)} disabled={clampedPageIndex >= totalPages - 1} type="button">Next</button>
+          <button className={!activeDate ? "active" : ""} onClick={() => onFocusDate(null)} type="button">Map all days</button>
+        </div>
       </div>
-      {dates.map((date, index) => {
-        const label = formatDayHeading(date, index);
-        const notes = dayNotes
-          .filter((note) => note.plannedDate === date && cityMatches(note.cityId))
-          .sort((left, right) => left.sortOrder - right.sortOrder);
-        const dayPlaces = places
-          .filter((place) => place.plannedDate === date && cityMatches(place.cityId) && categoryMatches(place.category))
-          .sort((left, right) => (left.daySortOrder ?? 0) - (right.daySortOrder ?? 0));
-        return (
-          <section className={`day-section${activeDate === date ? " active" : ""}`} key={date}>
-            <header>
-              <div>
-                <span>{label.day}</span>
-                <h2>{label.date}</h2>
-              </div>
-              <button onClick={() => onFocusDate(activeDate === date ? null : date)} type="button">{activeDate === date ? "Showing" : "Map this day"}</button>
-            </header>
-            <div className="day-notes">
-              {notes.map((note) => (
-                <DayNoteRow key={note.id} note={note} onRemove={onRemoveNote} onUpdate={onUpdateNote} />
-              ))}
-              <NoteComposer activeCityId={activeCityId} cities={cities} onAdd={(note, cityId) => onAddNote(date, note, cityId)} />
+      {currentDate && label ? (
+        <section className={`day-section${activeDate === currentDate ? " active" : ""}`}>
+          <header>
+            <div>
+              <span>{label.day}</span>
+              <h2>{label.date}</h2>
             </div>
-            <div className="day-place-list">
-              {dayPlaces.map((place, placeIndex) => {
-                const number = String(placeIndex + 1).padStart(2, "0");
-                return (
-                  <DayPlaceRow
-                    cities={cities}
-                    dates={dates}
-                    key={place.id}
-                    number={number}
-                    onSelect={onSelectPlace}
-                    onToggleSaved={onToggleSaved}
-                    onUpdatePlanning={onUpdatePlanning}
-                    place={place}
-                    selected={selectedId === place.id}
-                  />
-                );
-              })}
-              {!dayPlaces.length ? <p className="day-empty">No places planned for this day yet.</p> : null}
-            </div>
-          </section>
-        );
-      })}
-      {unplannedPlaces.length ? (
-        <section className="day-section unplanned-section">
-          <header><div><span>Unscheduled</span><h2>Saved for later</h2></div></header>
+            <button onClick={showCurrentDateOnMap} type="button">{activeDate === currentDate ? "Showing" : "Map this day"}</button>
+          </header>
+          <div className="day-notes">
+            {notes.map((note) => (
+              <DayNoteRow key={note.id} note={note} onRemove={onRemoveNote} onUpdate={onUpdateNote} />
+            ))}
+            <NoteComposer activeCityId={activeCityId} cities={cities} onAdd={(note, cityId) => onAddNote(currentDate, note, cityId)} />
+          </div>
           <div className="day-place-list">
-            {unplannedPlaces.map((place, placeIndex) => {
+            {dayPlaces.map((place, placeIndex) => {
+              const number = String(placeIndex + 1).padStart(2, "0");
+              return (
+                <DayPlaceRow
+                  cities={cities}
+                  dates={dates}
+                  key={place.id}
+                  number={number}
+                  onSelect={onSelectPlace}
+                  onToggleSaved={onToggleSaved}
+                  onUpdatePlanning={onUpdatePlanning}
+                  place={place}
+                  selected={selectedId === place.id}
+                />
+              );
+            })}
+            {!dayPlaces.length ? <p className="day-empty">No places planned for this day yet.</p> : null}
+          </div>
+        </section>
+      ) : null}
+      {!currentDate && hasUnplannedPage ? (
+        <section className="day-section unplanned-section">
+          <header>
+            <div><span>Unscheduled</span><h2>Saved for later</h2></div>
+            <button className={!activeDate ? "active" : ""} onClick={() => onFocusDate(null)} type="button">Map all days</button>
+          </header>
+          <div className="day-place-list">
+            {dayPlaces.map((place, placeIndex) => {
               const number = String(placeIndex + 1).padStart(2, "0");
               return (
                 <DayPlaceRow

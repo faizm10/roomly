@@ -520,10 +520,15 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .add-place-row strong { font-size: 13px; }
 .add-place-row small { margin-top: 4px; color: var(--muted); font-size: 10px; }
 .day-plan { padding-bottom: 28px; }
-.day-plan-intro { position: sticky; top: 0; z-index: 3; display: flex; min-height: 62px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: var(--paper); }
+.day-plan-intro { position: sticky; top: 0; z-index: 3; display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); background: var(--paper); }
 .day-plan-intro strong { display: block; margin-top: 4px; font-size: 12px; font-weight: 650; }
 .day-plan-intro button, .day-section header button { min-height: 30px; padding: 0 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 10px; font-weight: 650; cursor: pointer; }
+.day-plan-intro button:disabled { cursor: not-allowed; opacity: .38; }
 .day-plan-intro button.active, .day-section.active header button { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.day-pagination { display: grid; grid-template-columns: auto minmax(92px, auto) auto auto; align-items: center; border: 1px solid var(--line); background: var(--surface); }
+.day-pagination button { border: 0; border-right: 1px solid var(--line); background: transparent; }
+.day-pagination button:last-child { border-right: 0; }
+.day-pagination span { padding: 0 12px; color: var(--muted); font-size: 9px; font-weight: 750; letter-spacing: .08em; text-align: center; text-transform: uppercase; white-space: nowrap; }
 .day-section { padding: 26px 0 10px; border-bottom: 1px solid var(--line); }
 .day-section > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .day-section > header span { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
@@ -657,8 +662,9 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .selected-address { display: flex; margin: -10px 0 25px; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
 .field-label textarea { resize: vertical; }
 .field-label small { color: var(--muted); font-weight: 400; }
-.url-input { display: flex; padding-left: 13px; align-items: center; gap: 8px; border: 1px solid var(--line); }
-.url-input input { padding-left: 0; border: 0; }
+.url-input, .day-select-input { display: flex; padding-left: 13px; align-items: center; gap: 8px; border: 1px solid var(--line); }
+.url-input input, .day-select-input select { padding-left: 0; border: 0; }
+.day-select-input svg, .url-input svg { flex: none; color: var(--muted); }
 .nav-dialog { position: relative; max-width: 430px; text-align: center; }
 .nav-close { position: absolute; top: 14px; right: 14px; }
 .nav-compass { display: grid; width: 64px; height: 64px; margin: 6px auto 24px; place-items: center; border: 1px solid var(--ink); border-radius: 50%; }
@@ -786,6 +792,9 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
   .saved-place-copy h2 { font-size: 21px; }
   .saved-place-copy > small { font-size: 10px; }
   .place-note { margin-top: 15px; font-size: 12px; }
+  .day-plan-intro { align-items: flex-start; flex-direction: column; padding: 12px 0; }
+  .day-pagination { width: 100%; grid-template-columns: auto 1fr auto; }
+  .day-pagination button:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); }
   .day-section > header h2 { font-size: 23px; }
   .day-notes { padding-left: 38px; }
   .note-composer { grid-template-columns: auto 1fr auto; }

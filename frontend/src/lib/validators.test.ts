@@ -48,6 +48,23 @@ describe("trip validation", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts an optional planned day when saving a place", () => {
+    const result = addPlaceSchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      cityId: "83cb9471-a356-4a42-a13f-23c6fb93bb0d",
+      fsqPlaceId: "fsq-2",
+      name: "Shinjuku Gyoen National Garden",
+      address: "11 Naitomachi, Shinjuku City",
+      neighborhood: "Shinjuku",
+      longitude: 139.7101,
+      latitude: 35.6852,
+      category: "See",
+      plannedDate: "2026-09-24",
+      daySortOrder: 2,
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("rejects a place save without a name or coordinates", () => {
     const result = addPlaceSchema.safeParse({ tripId: "210e9464-8cad-406b-96a0-b1463ce0eace", fsqPlaceId: "fsq-1", category: "Eat" });
     expect(result.success).toBe(false);
