@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const memberRole = pgEnum("member_role", ["owner", "editor"]);
+export const invitationKind = pgEnum("invitation_kind", ["email", "share"]);
 
 export const trips = pgTable(
   "trips",
@@ -50,14 +51,34 @@ export const tripInvitations = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
-    email: text("email").notNull(),
+    kind: invitationKind("kind").notNull().default("email"),
+    email: text("email"),
     tokenHash: text("token_hash").notNull().unique(),
+    role: memberRole("role").notNull().default("editor"),
     invitedBy: text("invited_by").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedBy: text("revoked_by"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("trip_invitations_trip_idx").on(table.tripId)],
+);
+
+export const tripInvitationAcceptances = pgTable(
+  "trip_invitation_acceptances",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    invitationId: uuid("invitation_id").notNull().references(() => tripInvitations.id, { onDelete: "cascade" }),
+    tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("trip_invitation_acceptances_unique").on(table.invitationId, table.userId),
+    index("trip_invitation_acceptances_trip_idx").on(table.tripId),
+    index("trip_invitation_acceptances_user_idx").on(table.userId),
+  ],
 );
 
 export const tripCities = pgTable(

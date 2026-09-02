@@ -11,7 +11,9 @@ import {
 
 export function GoogleAuthCallback() {
   useEffect(() => {
-    const verifier = new URLSearchParams(window.location.search).get(SESSION_VERIFIER_PARAM);
+    const params = new URLSearchParams(window.location.search);
+    const verifier = params.get(SESSION_VERIFIER_PARAM);
+    const returnTo = params.get("returnTo") || "/trips";
     const payload: GoogleAuthMessage = { type: GOOGLE_AUTH_MESSAGE, verifier };
 
     window.opener?.postMessage(payload, window.location.origin);
@@ -28,7 +30,7 @@ export function GoogleAuthCallback() {
       return;
     }
 
-    window.location.replace(tripsUrlWithVerifier(verifier));
+    window.location.replace(tripsUrlWithVerifier(verifier, returnTo));
   }, []);
 
   return (

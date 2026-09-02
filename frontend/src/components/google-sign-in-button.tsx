@@ -35,14 +35,16 @@ function isGoogleAuthMessage(data: unknown): data is GoogleAuthMessage {
   return Boolean(data && typeof data === "object" && "type" in data && data.type === GOOGLE_AUTH_MESSAGE);
 }
 
-async function requestGoogleUrl() {
+async function requestGoogleUrl(returnTo: string) {
+  const callback = new URL("/auth/callback", window.location.origin);
+  callback.searchParams.set("returnTo", returnTo);
   const response = await fetch("/api/auth/sign-in/social", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       provider: "google",
-      callbackURL: `${window.location.origin}/auth/callback`,
+      callbackURL: callback.toString(),
       disableRedirect: true,
     }),
   });
@@ -56,9 +58,11 @@ async function requestGoogleUrl() {
 export function GoogleSignInButton({
   authEnabled,
   label,
+  returnTo = "/trips",
 }: {
   authEnabled: boolean;
   label: string;
+  returnTo?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -75,7 +79,7 @@ export function GoogleSignInButton({
 
     if (!tab) {
       try {
-        const url = await requestGoogleUrl();
+        const url = await requestGoogleUrl(returnTo);
         window.location.assign(url);
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : "Google sign-in could not start.");
@@ -92,7 +96,7 @@ export function GoogleSignInButton({
       settled = true;
       cleanup();
       window.focus();
-      window.location.replace(tripsUrlWithVerifier(verifier));
+      window.location.replace(tripsUrlWithVerifier(verifier, returnTo));
     }
 
     function fail(message: string) {
@@ -139,7 +143,7 @@ export function GoogleSignInButton({
     }
 
     try {
-      tab.location.assign(await requestGoogleUrl());
+      tab.location.assign(await requestGoogleUrl(returnTo));
     } catch (reason) {
       fail(reason instanceof Error ? reason.message : "Google sign-in could not start.");
     }

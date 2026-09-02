@@ -67,6 +67,18 @@ export type Collaborator = {
   image?: string | null;
 };
 
+export type InviteKind = "email" | "share";
+
+export type TripInvitationSummary = {
+  id: string;
+  kind: InviteKind;
+  email?: string | null;
+  role: "editor";
+  expiresAt: string;
+  invitedBy: string;
+  createdAt: string;
+};
+
 export type Trip = {
   id: string;
   title: string;

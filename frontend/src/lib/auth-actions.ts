@@ -2,11 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { getNeonAuth } from "@/lib/auth";
+import { safeReturnTo } from "@/lib/invitations";
 import { accountNameSchema, signInSchema, signUpSchema } from "@/lib/validators";
 
 export type AuthFormState = {
   error?: string;
   ok?: boolean;
+  returnTo?: string;
   values?: { name?: string; email?: string };
 } | null;
 
@@ -20,6 +22,7 @@ function valuesFrom(formData: FormData) {
 function unavailable(formData: FormData): AuthFormState {
   return {
     error: "Sign-in is unavailable right now. Try again in a moment.",
+    returnTo: safeReturnTo(String(formData.get("returnTo") ?? "")),
     values: valuesFrom(formData),
   };
 }
@@ -34,21 +37,22 @@ export async function signInWithEmail(
     password: formData.get("password"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check your details.", values };
+    return { error: parsed.error.issues[0]?.message ?? "Check your details.", returnTo: safeReturnTo(String(formData.get("returnTo") ?? "")), values };
   }
 
   const auth = getNeonAuth();
   if (!auth) return unavailable(formData);
+  const returnTo = safeReturnTo(String(formData.get("returnTo") ?? ""));
 
   const { error } = await auth.signIn.email({
     ...parsed.data,
-    callbackURL: "/trips",
+    callbackURL: returnTo,
   });
   if (error) {
-    return { error: error.message || "Those details did not match an account.", values };
+    return { error: error.message || "Those details did not match an account.", returnTo, values };
   }
 
-  return { ok: true };
+  return { ok: true, returnTo };
 }
 
 export async function signUpWithEmail(
@@ -63,24 +67,25 @@ export async function signUpWithEmail(
     confirmPassword: formData.get("confirmPassword"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check your details.", values };
+    return { error: parsed.error.issues[0]?.message ?? "Check your details.", returnTo: safeReturnTo(String(formData.get("returnTo") ?? "")), values };
   }
 
   const auth = getNeonAuth();
   if (!auth) return unavailable(formData);
+  const returnTo = safeReturnTo(String(formData.get("returnTo") ?? ""));
 
   const { name, email, password } = parsed.data;
   const { error } = await auth.signUp.email({
     name,
     email,
     password,
-    callbackURL: "/trips",
+    callbackURL: returnTo,
   });
   if (error) {
-    return { error: error.message || "The account could not be created.", values };
+    return { error: error.message || "The account could not be created.", returnTo, values };
   }
 
-  return { ok: true };
+  return { ok: true, returnTo };
 }
 
 export type AccountFormState = { error: string; name?: string } | null;

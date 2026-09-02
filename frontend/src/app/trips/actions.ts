@@ -1,21 +1,27 @@
 "use server";
 
-import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { getDatabase } from "@/lib/db";
 import { countryFromDestination } from "@/lib/dates";
-import { tripCities, tripDayNotes, tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
+import { tripCities, tripDayNotes, tripInvitationAcceptances, tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
+import { createInviteToken, hashInviteToken, inviteExpiresAt, inviteStatus } from "@/lib/invitations";
+import type { TripInvitationSummary } from "@/lib/types";
 import {
   addDayNoteSchema,
   addPlaceSchema,
   addTripCitySchema,
+  createEmailInviteSchema,
+  createShareInviteSchema,
   createTripSchema,
   inviteSchema,
+  inviteTokenSchema,
   removeDayNoteSchema,
   removePlaceSchema,
   removeTripCitySchema,
+  revokeInviteSchema,
   updateDayNoteSchema,
   updatePlacePlanningSchema,
   updatePlaceSchema,
@@ -67,6 +73,40 @@ function isPlanningSchemaMissing(error: unknown) {
 
 function planningMigrationError() {
   return new Error("Day planning needs the latest database migration before it can be saved.");
+}
+
+function inviteSchemaMigrationError() {
+  return new Error("Invites need the latest database migration before they can be used.");
+}
+
+function isInviteSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /invitation_kind|trip_invitation_acceptances|kind|role|revoked_at|revoked_by|relation .* does not exist|column .* does not exist/i.test(message);
+}
+
+function toIso(value: string | Date) {
+  if (typeof value === "string") return value;
+  return value.toISOString();
+}
+
+function toInviteSummary(row: {
+  id: string;
+  kind: "email" | "share";
+  email: string | null;
+  role: "owner" | "editor";
+  expiresAt: Date | string;
+  invitedBy: string;
+  createdAt: Date | string;
+}): TripInvitationSummary {
+  return {
+    id: row.id,
+    kind: row.kind,
+    email: row.email,
+    role: "editor",
+    expiresAt: toIso(row.expiresAt),
+    invitedBy: row.invitedBy,
+    createdAt: toIso(row.createdAt),
+  };
 }
 
 export async function createTrip(input: unknown) {
@@ -369,52 +409,188 @@ export async function removeDayNote(input: unknown) {
   return { demo: false };
 }
 
-export async function inviteCollaborator(input: unknown) {
+export async function listTripInvites(input: unknown): Promise<{ demo: boolean; invites: TripInvitationSummary[] }> {
   const viewer = await requireViewer();
-  const data = inviteSchema.parse(input);
+  const data = createShareInviteSchema.parse(input);
   const db = getDatabase();
-  if (!db) return { inviteUrl: "/invite/demo-lisbon-board", demo: true };
+  if (!db) return { demo: true, invites: [] };
   await requireOwner(data.tripId, viewer.id);
-  const token = randomBytes(32).toString("base64url");
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await db.insert(tripInvitations).values({
-    tripId: data.tripId,
-    email: data.email,
-    tokenHash,
-    invitedBy: viewer.id,
-    expiresAt,
-  });
-  return { inviteUrl: `/invite/${token}`, demo: false };
+  try {
+    const rows = await db
+      .select({
+        id: tripInvitations.id,
+        kind: tripInvitations.kind,
+        email: tripInvitations.email,
+        role: tripInvitations.role,
+        expiresAt: tripInvitations.expiresAt,
+        invitedBy: tripInvitations.invitedBy,
+        createdAt: tripInvitations.createdAt,
+      })
+      .from(tripInvitations)
+      .where(and(
+        eq(tripInvitations.tripId, data.tripId),
+        isNull(tripInvitations.revokedAt),
+        gt(tripInvitations.expiresAt, new Date()),
+        or(eq(tripInvitations.kind, "share"), isNull(tripInvitations.acceptedAt)),
+      ))
+      .orderBy(desc(tripInvitations.createdAt));
+    return { demo: false, invites: rows.map(toInviteSummary) };
+  } catch (error) {
+    if (isInviteSchemaMissing(error)) throw inviteSchemaMigrationError();
+    throw error;
+  }
+}
+
+export async function createEmailInvite(input: unknown) {
+  const viewer = await requireViewer();
+  const data = createEmailInviteSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { inviteUrl: "/invite/demo-lisbon-board", demo: true, expiresAt: inviteExpiresAt().toISOString() };
+  await requireOwner(data.tripId, viewer.id);
+  const token = createInviteToken();
+  const expiresAt = inviteExpiresAt();
+  try {
+    const [invite] = await db
+      .insert(tripInvitations)
+      .values({
+        tripId: data.tripId,
+        kind: "email",
+        email: data.email,
+        tokenHash: hashInviteToken(token),
+        role: "editor",
+        invitedBy: viewer.id,
+        expiresAt,
+      })
+      .returning({ id: tripInvitations.id });
+    revalidateTrip(data.tripId);
+    return { inviteUrl: `/invite/${token}`, demo: false, expiresAt: expiresAt.toISOString(), id: invite.id };
+  } catch (error) {
+    if (isInviteSchemaMissing(error)) throw inviteSchemaMigrationError();
+    throw error;
+  }
+}
+
+export async function createShareInvite(input: unknown) {
+  const viewer = await requireViewer();
+  const data = createShareInviteSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { inviteUrl: "/invite/demo-lisbon-board", demo: true, expiresAt: inviteExpiresAt().toISOString() };
+  await requireOwner(data.tripId, viewer.id);
+  const token = createInviteToken();
+  const expiresAt = inviteExpiresAt();
+  try {
+    const [invite] = await db
+      .insert(tripInvitations)
+      .values({
+        tripId: data.tripId,
+        kind: "share",
+        email: null,
+        tokenHash: hashInviteToken(token),
+        role: "editor",
+        invitedBy: viewer.id,
+        expiresAt,
+      })
+      .returning({ id: tripInvitations.id });
+    revalidateTrip(data.tripId);
+    return { inviteUrl: `/invite/${token}`, demo: false, expiresAt: expiresAt.toISOString(), id: invite.id };
+  } catch (error) {
+    if (isInviteSchemaMissing(error)) throw inviteSchemaMigrationError();
+    throw error;
+  }
+}
+
+export async function revokeInvite(input: unknown) {
+  const viewer = await requireViewer();
+  const data = revokeInviteSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireOwner(data.tripId, viewer.id);
+  try {
+    await db
+      .update(tripInvitations)
+      .set({ revokedAt: new Date(), revokedBy: viewer.id })
+      .where(and(eq(tripInvitations.id, data.invitationId), eq(tripInvitations.tripId, data.tripId), isNull(tripInvitations.revokedAt)));
+    revalidateTrip(data.tripId);
+    return { demo: false };
+  } catch (error) {
+    if (isInviteSchemaMissing(error)) throw inviteSchemaMigrationError();
+    throw error;
+  }
+}
+
+export async function inviteCollaborator(input: unknown) {
+  const data = inviteSchema.parse(input);
+  return createEmailInvite(data);
 }
 
 export async function acceptInvitation(rawToken: string) {
+  if (rawToken === "demo-lisbon-board") redirect("/trips/lisbon-weekender");
+  const token = inviteTokenSchema.parse(rawToken);
   const viewer = await requireViewer();
   const db = getDatabase();
-  if (!db) return { tripId: "lisbon-weekender", demo: true };
-  const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-  const [invitation] = await db
-    .select()
-    .from(tripInvitations)
-    .where(and(eq(tripInvitations.tokenHash, tokenHash), isNull(tripInvitations.acceptedAt)))
-    .limit(1);
-  if (!invitation || invitation.expiresAt.getTime() < Date.now()) throw new Error("This invitation has expired.");
-  if (!viewer.email || viewer.email.toLowerCase() !== invitation.email.toLowerCase()) {
-    throw new Error("Sign in with the email address that received this invitation.");
+  if (!db) redirect("/trips/lisbon-weekender");
+  const tokenHash = hashInviteToken(token);
+  let tripId = "";
+  try {
+    const [invitation] = await db
+      .select()
+      .from(tripInvitations)
+      .where(eq(tripInvitations.tokenHash, tokenHash))
+      .limit(1);
+    if (!invitation) throw new Error("This invite link is not valid.");
+    tripId = invitation.tripId;
+
+    const [membership] = await db
+      .select({ role: tripMembers.role })
+      .from(tripMembers)
+      .where(and(eq(tripMembers.tripId, invitation.tripId), eq(tripMembers.userId, viewer.id)))
+      .limit(1);
+    if (!membership) {
+      const status = inviteStatus({
+        kind: invitation.kind,
+        expiresAt: invitation.expiresAt,
+        revokedAt: invitation.revokedAt,
+        acceptedAt: invitation.acceptedAt,
+      });
+      if (status === "revoked") throw new Error("This invite link was revoked.");
+      if (status === "expired") throw new Error("This invite link has expired.");
+      if (status === "accepted") throw new Error("This invite link has already been used.");
+      if (invitation.kind === "email" && (!viewer.email || viewer.email.toLowerCase() !== invitation.email?.toLowerCase())) {
+        throw new Error("Sign in with the email address that received this invitation.");
+      }
+      await db
+        .insert(tripMembers)
+        .values({
+          tripId: invitation.tripId,
+          userId: viewer.id,
+          role: "editor",
+          displayName: viewer.name?.trim() || "Traveller",
+          image: viewer.image || null,
+        })
+        .onConflictDoNothing();
+      await db
+        .insert(tripInvitationAcceptances)
+        .values({
+          invitationId: invitation.id,
+          tripId: invitation.tripId,
+          userId: viewer.id,
+        })
+        .onConflictDoNothing();
+      if (invitation.kind === "email") {
+        await db.update(tripInvitations).set({ acceptedAt: new Date() }).where(eq(tripInvitations.id, invitation.id));
+      }
+    }
+  } catch (error) {
+    if (isInviteSchemaMissing(error)) throw inviteSchemaMigrationError();
+    throw error;
   }
-  await db
-    .insert(tripMembers)
-    .values({
-      tripId: invitation.tripId,
-      userId: viewer.id,
-      role: "editor",
-      displayName: viewer.name?.trim() || "Traveller",
-      image: viewer.image || null,
-    })
-    .onConflictDoNothing();
-  await db.update(tripInvitations).set({ acceptedAt: new Date() }).where(eq(tripInvitations.id, invitation.id));
-  revalidatePath(`/trips/${invitation.tripId}`);
-  return { tripId: invitation.tripId, demo: false };
+  revalidatePath("/trips");
+  revalidatePath(`/trips/${tripId}`);
+  redirect(`/trips/${tripId}`);
+}
+
+export async function acceptInvitationForm(formData: FormData) {
+  await acceptInvitation(String(formData.get("token") ?? ""));
 }
 
 export async function updateTrip(input: unknown) {

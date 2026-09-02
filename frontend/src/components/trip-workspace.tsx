@@ -5,7 +5,6 @@ import {
   Bike,
   Bookmark,
   CalendarDays,
-  Check,
   Coffee,
   FileText,
   ExternalLink,
@@ -39,6 +38,7 @@ import {
 } from "@/app/trips/actions";
 import { AddPlaceDialog } from "@/components/add-place-dialog";
 import { CityField } from "@/components/city-field";
+import { InviteDialog } from "@/components/invite-dialog";
 import { PlacePhoto } from "@/components/place-photo";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { TripLogisticsDialog, type TripDetails } from "@/components/trip-logistics-dialog";
@@ -133,11 +133,11 @@ export function TripWorkspace({
   const [mobileView, setMobileView] = useState<MobileView>("list");
   const [addOpen, setAddOpen] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [logisticsOpen, setLogisticsOpen] = useState(false);
   const [routeMode, setRouteMode] = useState<TravelMode | null>(null);
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
   const [navOpen, setNavOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const navDialogRef = useRef<HTMLElement>(null);
   const persistChain = useRef(Promise.resolve());
@@ -436,13 +436,6 @@ export function TripWorkspace({
     });
   }
 
-  async function share() {
-    const inviteUrl = `${window.location.origin}/invite/demo-lisbon-board`;
-    await navigator.clipboard?.writeText(inviteUrl);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
-  }
-
   const activeRouteStats = routeMode && mapPlaces.length >= 2 ? routeStats : null;
   const minutes = activeRouteStats ? Math.max(1, Math.round(activeRouteStats.durationSeconds / 60)) : null;
   const kilometers = activeRouteStats ? (activeRouteStats.distanceMeters / 1000).toFixed(1) : null;
@@ -490,7 +483,7 @@ export function TripWorkspace({
                 {saveState === "saving" ? "Saving" : saveState === "saved" ? "Saved" : "Couldn’t save"}
               </span>
             ) : null}
-            <button onClick={share} type="button">{copied ? <Check size={14} /> : <Share2 size={14} />}{copied ? "Link copied" : "Invite"}</button>
+            <button onClick={() => setInviteOpen(true)} type="button"><Share2 size={14} /> Invite</button>
           </div>
           <div className="filter-scroll" aria-label="Filter places">
             <button className={`filter-pill filter-all${filter === "All" ? " active" : ""}`} onClick={() => setFilter("All")} type="button">All</button>
@@ -599,6 +592,7 @@ export function TripWorkspace({
       <button className="mobile-add-button" onClick={() => setAddOpen(true)} aria-label="Add a place" type="button"><Plus size={22} /></button>
       {addOpen ? <AddPlaceDialog destination={selectedCity?.name ?? details.destination} onAdd={addPlace} onClose={() => setAddOpen(false)} /> : null}
       {cityOpen ? <AddCityDialog details={details} onAdd={addCity} onClose={() => setCityOpen(false)} /> : null}
+      {inviteOpen ? <InviteDialog demo={!persistable} onClose={() => setInviteOpen(false)} tripId={trip.id} /> : null}
       {logisticsOpen ? (
         <TripLogisticsDialog
           onClose={() => setLogisticsOpen(false)}

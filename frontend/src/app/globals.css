@@ -594,10 +594,35 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 
 /* Dialogs and place search */
 .dialog-backdrop { position: fixed; inset: 0; z-index: 200; display: flex; padding: 24px; align-items: center; justify-content: center; background: rgba(17,17,17,.45); }
-.place-dialog, .nav-dialog { width: min(100%, 590px); max-height: min(780px, calc(100svh - 48px)); padding: 24px; overflow-y: auto; border: 1px solid var(--ink); background: var(--paper); }
-.place-dialog > header { display: flex; margin-bottom: 24px; align-items: center; justify-content: space-between; }
+.place-dialog, .nav-dialog, .invite-dialog { width: min(100%, 590px); max-height: min(780px, calc(100svh - 48px)); padding: 24px; overflow-y: auto; border: 1px solid var(--ink); background: var(--paper); }
+.place-dialog > header, .invite-dialog > header { display: flex; margin-bottom: 24px; align-items: center; justify-content: space-between; }
 .dialog-step { color: var(--muted); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
-.place-dialog h2, .nav-dialog h2 { margin: 10px 0 25px; font-family: var(--font-handwritten), cursive; font-size: 44px; line-height: 1; }
+.place-dialog h2, .nav-dialog h2, .invite-dialog h2 { margin: 10px 0 25px; font-family: var(--font-handwritten), cursive; font-size: 44px; line-height: 1; }
+.invite-dialog h2 { margin-bottom: 0; }
+.invite-mode { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--ink); }
+.invite-mode button { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px; border: 0; border-right: 1px solid var(--ink); background: var(--paper); color: var(--muted); font-size: 11px; font-weight: 650; cursor: pointer; }
+.invite-mode button:last-child { border-right: 0; }
+.invite-mode button.active { background: var(--ink); color: var(--paper); }
+.invite-create-panel { display: grid; margin-top: 18px; gap: 14px; }
+.invite-create-panel > p { margin: 0; padding: 16px; border: 1px solid var(--line); background: var(--surface); color: #3f3f3f; font-size: 13px; line-height: 1.45; }
+.generated-invite { display: grid; margin-top: 16px; padding: 13px; grid-template-columns: 1fr auto; gap: 12px; align-items: center; border: 1px solid var(--ink); background: var(--surface); }
+.generated-invite small, .generated-invite span { display: block; color: var(--muted); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.generated-invite strong { display: block; max-width: 390px; margin: 5px 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.generated-invite button, .pending-invite button { display: inline-flex; min-height: 30px; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-size: 10px; font-weight: 650; cursor: pointer; }
+.generated-invite button { padding: 0 10px; }
+.invite-message { margin: 12px 0 0; color: var(--cat-shop-ink); font-size: 12px; font-weight: 650; }
+.pending-invites { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
+.pending-invites-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.pending-invites-heading span { color: var(--muted); font-size: 10px; }
+.pending-invite { display: grid; min-height: 58px; padding: 11px 0; grid-template-columns: 1fr auto; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+.pending-invite strong, .pending-invite small { display: block; }
+.pending-invite strong { font-size: 13px; }
+.pending-invite small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.pending-invite button { padding: 0 9px; color: var(--muted); }
+.invite-empty { margin: 14px 0 0; color: var(--muted); font-size: 12px; }
+.invite-actions { display: flex; margin-top: 28px; flex-wrap: wrap; gap: 10px; }
+.invite-status-card { margin-top: 28px; padding: 14px 16px; border: 1px solid var(--line); background: var(--surface); color: #3f3f3f; font-size: 13px; line-height: 1.45; }
+.invite-expiry { display: inline-flex; margin-top: 18px; align-items: center; gap: 6px; }
 .logistics-dialog .new-trip-form { width: 100%; }
 .logistics-dialog .new-trip-form .button { margin-top: 6px; }
 .place-search-box { display: flex; padding: 0 14px; align-items: center; gap: 10px; border: 1px solid var(--ink); background: var(--paper); }
@@ -760,8 +785,11 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
   .route-summary .button { justify-self: end; }
   .mode-picker span { display: none; }
   .dialog-backdrop { padding: 0; align-items: flex-end; }
-  .place-dialog, .nav-dialog { width: 100%; max-width: none; max-height: 94svh; padding: 20px 18px 34px; border-right: 0; border-bottom: 0; border-left: 0; }
-  .place-dialog h2, .nav-dialog h2 { font-size: 39px; }
+  .place-dialog, .nav-dialog, .invite-dialog { width: 100%; max-width: none; max-height: 94svh; padding: 20px 18px 34px; border-right: 0; border-bottom: 0; border-left: 0; }
+  .place-dialog h2, .nav-dialog h2, .invite-dialog h2 { font-size: 39px; }
+  .generated-invite { grid-template-columns: 1fr; }
+  .generated-invite strong { max-width: calc(100vw - 72px); }
+  .pending-invite { grid-template-columns: 1fr; }
   .search-result { grid-template-columns: auto 1fr auto; }
 }
 

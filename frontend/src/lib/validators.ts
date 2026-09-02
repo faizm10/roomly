@@ -128,10 +128,22 @@ export const directionsSchema = z.object({
   mode: z.enum(["walking", "cycling", "driving"]),
 });
 
-export const inviteSchema = z.object({
+const tripIdField = { tripId: z.string().uuid() };
+export const inviteTokenSchema = z.string().trim().min(20).max(160);
+
+export const createEmailInviteSchema = z.object({
   tripId: z.string().uuid(),
   email: z.email().toLowerCase(),
 });
+
+export const createShareInviteSchema = z.object(tripIdField);
+
+export const revokeInviteSchema = z.object({
+  tripId: z.string().uuid(),
+  invitationId: z.string().uuid(),
+});
+
+export const inviteSchema = createEmailInviteSchema;
 
 export const signInSchema = z.object({
   email: z.email("Enter a valid email.").toLowerCase(),
