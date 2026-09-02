@@ -36,6 +36,13 @@
       "when": 1788315112362,
       "tag": "0004_rare_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788320833984,
+      "tag": "0005_skinny_sentinels",
+      "breakpoints": true
     }
   ]
 }

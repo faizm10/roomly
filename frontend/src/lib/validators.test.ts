@@ -4,8 +4,12 @@ import {
   addDayNoteSchema,
   addPlaceSchema,
   addTripCitySchema,
+  createEmailInviteSchema,
+  createShareInviteSchema,
   createTripSchema,
   directionsSchema,
+  inviteTokenSchema,
+  revokeInviteSchema,
   signInSchema,
   signUpSchema,
   updatePlacePlanningSchema,
@@ -88,6 +92,32 @@ describe("trip validation", () => {
       note: "Book the early train.",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts an email-bound trip invite", () => {
+    const result = createEmailInviteSchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      email: "FRIEND@EXAMPLE.COM",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.email).toBe("friend@example.com");
+  });
+
+  it("accepts a share invite request", () => {
+    expect(createShareInviteSchema.safeParse({ tripId: "210e9464-8cad-406b-96a0-b1463ce0eace" }).success).toBe(true);
+  });
+
+  it("accepts a revoke invite request", () => {
+    expect(
+      revokeInviteSchema.safeParse({
+        tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+        invitationId: "83cb9471-a356-4a42-a13f-23c6fb93bb0c",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects short invite tokens", () => {
+    expect(inviteTokenSchema.safeParse("short").success).toBe(false);
   });
 
   it("caps directions requests at twelve stops", () => {

@@ -3,24 +3,27 @@ import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
 import { AuthShell } from "@/components/auth-shell";
 import { getViewer, isNeonAuthConfigured } from "@/lib/auth";
+import { safeReturnTo } from "@/lib/invitations";
 
 export const metadata: Metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
 
-export default async function SignInPage() {
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ returnTo?: string }> }) {
+  const { returnTo: rawReturnTo } = await searchParams;
+  const returnTo = safeReturnTo(rawReturnTo);
   const viewer = await getViewer();
-  if (viewer && !viewer.demo) redirect("/trips");
+  if (viewer && !viewer.demo) redirect(returnTo);
 
   return (
     <AuthShell
       eyebrow="Your boards"
       lede="Pick up a shared map, add the next place, and keep the trip in one shortlist."
       switchAsButton
-      switchHref="/sign-up"
+      switchHref={`/sign-up?returnTo=${encodeURIComponent(returnTo)}`}
       switchLabel="Create account"
       title="Your map is waiting."
     >
-      <AuthForm authEnabled={isNeonAuthConfigured()} mode="sign-in" />
+      <AuthForm authEnabled={isNeonAuthConfigured()} mode="sign-in" returnTo={returnTo} />
     </AuthShell>
   );
 }

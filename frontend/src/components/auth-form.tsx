@@ -56,9 +56,11 @@ function PasswordField({
 export function AuthForm({
   authEnabled,
   mode,
+  returnTo = "/trips",
 }: {
   authEnabled: boolean;
   mode: AuthMode;
+  returnTo?: string;
 }) {
   const action = mode === "sign-in" ? signInWithEmail : signUpWithEmail;
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
@@ -68,8 +70,8 @@ export function AuthForm({
   const isSignUp = mode === "sign-up";
 
   useEffect(() => {
-    if (state?.ok) window.location.replace("/trips");
-  }, [state]);
+    if (state?.ok) window.location.replace(state.returnTo || returnTo);
+  }, [returnTo, state]);
 
   return (
     <div className="auth-panel">
@@ -82,6 +84,7 @@ export function AuthForm({
       </p>
 
       <form action={formAction} className="auth-form" key={state?.error ?? "ready"}>
+        <input name="returnTo" type="hidden" value={state?.returnTo ?? returnTo} />
         {isSignUp ? (
           <label className="field-label" htmlFor="name">
             <span>Name</span>
@@ -153,16 +156,17 @@ export function AuthForm({
       <GoogleSignInButton
         authEnabled={authEnabled}
         label={isSignUp ? "Continue with Google" : "Sign in with Google"}
+        returnTo={returnTo}
       />
 
       <p className="auth-switch">
         {isSignUp ? (
           <>
-            Already have an account? <Link href="/sign-in">Sign in</Link>
+            Already have an account? <Link href={`/sign-in?returnTo=${encodeURIComponent(returnTo)}`}>Sign in</Link>
           </>
         ) : (
           <>
-            New to Roamboard? <Link href="/sign-up">Create an account</Link>
+            New to Roamboard? <Link href={`/sign-up?returnTo=${encodeURIComponent(returnTo)}`}>Create an account</Link>
           </>
         )}
       </p>

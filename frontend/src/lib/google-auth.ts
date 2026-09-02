@@ -7,8 +7,14 @@ export type GoogleAuthMessage = {
   verifier?: string | null;
 };
 
-export function tripsUrlWithVerifier(verifier?: string | null) {
-  if (!verifier) return "/trips";
+function safeAuthReturnTo(value: string) {
+  return value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") ? value : "/trips";
+}
+
+export function tripsUrlWithVerifier(verifier?: string | null, returnTo = "/trips") {
+  const safeReturnTo = safeAuthReturnTo(returnTo);
+  if (!verifier) return safeReturnTo;
   const params = new URLSearchParams({ [SESSION_VERIFIER_PARAM]: verifier });
-  return `/trips?${params.toString()}`;
+  const separator = safeReturnTo.includes("?") ? "&" : "?";
+  return `${safeReturnTo}${separator}${params.toString()}`;
 }
