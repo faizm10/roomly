@@ -1,15 +1,42 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getNeonAuth } from "@/lib/auth";
+import { isPublicAuthPath, LOGIN_URL } from "@/lib/auth-routes";
+import { SESSION_VERIFIER_PARAM } from "@/lib/google-auth";
 
-const PUBLIC_PATHS = new Set(["/trips/lisbon-weekender"]);
+function isLoginRedirect(response: NextResponse) {
+  const location = response.headers.get("location");
+  if (!location) return false;
+  return new URL(location, "http://proxy.invalid").pathname === LOGIN_URL;
+}
 
 export async function proxy(request: NextRequest) {
   const auth = getNeonAuth();
   if (!auth) return NextResponse.next();
-  if (PUBLIC_PATHS.has(request.nextUrl.pathname)) return NextResponse.next();
-  return auth.middleware({ loginUrl: "/sign-in" })(request);
+
+  const publicPath = isPublicAuthPath(request.nextUrl.pathname);
+  if (publicPath && !request.nextUrl.searchParams.has(SESSION_VERIFIER_PARAM)) {
+    return NextResponse.next();
+  }
+
+  const response = await auth.middleware({ loginUrl: LOGIN_URL })(request);
+  if (!publicPath || !isLoginRedirect(response)) return response;
+
+  // The exchange did not produce a session, but a public page still renders.
+  const passthrough = NextResponse.next();
+  for (const cookie of response.headers.getSetCookie()) {
+    passthrough.headers.append("set-cookie", cookie);
+  }
+  return passthrough;
 }
 
 export const config = {
-  matcher: ["/trips", "/trips/new", "/trips/:path*", "/account", "/account/:path*"],
+  matcher: [
+    "/trips",
+    "/trips/new",
+    "/trips/:path*",
+    "/account",
+    "/account/:path*",
+    "/invite/:path*",
+    "/auth/callback",
+  ],
 };

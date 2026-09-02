@@ -1,8 +1,19 @@
-const CACHE = "roamboard-shell-v1";
-const SHELL = ["/", "/trips", "/roamboard-mark.svg"];
+const CACHE = "roamboard-shell-v2";
+const SHELL = ["/", "/roamboard-mark.svg"];
+
+// Pages behind or around sign-in render per viewer, so they are never cached
+// and never replayed. The auth round-trip also has to reach the network so the
+// proxy can turn a Google callback into a session cookie.
+const PRIVATE = /^\/(api|auth|sign-in|sign-up|invite|account|trips)(\/|$)/;
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      // credentials: "omit" keeps the shell anonymous even when a signed-in
+      // visitor is the one installing it.
+      .then((cache) => cache.addAll(SHELL.map((path) => new Request(path, { credentials: "omit" })))),
+  );
   self.skipWaiting();
 });
 
@@ -14,17 +25,25 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-  if (event.request.method !== "GET" || url.pathname.startsWith("/api/") || url.hostname.includes("mapbox") || url.hostname.includes("foursquare") || url.hostname.includes("googleapis") || url.hostname.includes("googleusercontent")) return;
+  const { request } = event;
+  const url = new URL(request.url);
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (PRIVATE.test(url.pathname)) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(fetch(request).catch(() => caches.match("/")));
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then((response) => {
-        if (response.ok && url.origin === self.location.origin) {
+        if (response.ok) {
           const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+          caches.open(CACHE).then((cache) => cache.put(request, copy));
         }
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached ?? caches.match("/"))),
+      .catch(() => caches.match(request)),
   );
 });
