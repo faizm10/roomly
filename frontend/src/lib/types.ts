@@ -29,6 +29,7 @@ export type PlacePhoto = {
 export type Place = {
   id: string;
   fsqPlaceId: string;
+  cityId?: string | null;
   name: string;
   address: string;
   neighborhood: string;
@@ -37,6 +38,26 @@ export type Place = {
   sourceUrl?: string;
   coordinates: [longitude: number, latitude: number];
   saved: boolean;
+  plannedDate?: string | null;
+  daySortOrder?: number;
+  addedBy: string;
+};
+
+export type CityStop = {
+  id: string;
+  name: string;
+  country: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  sortOrder: number;
+};
+
+export type DayNote = {
+  id: string;
+  cityId?: string | null;
+  plannedDate: string;
+  note: string;
+  sortOrder: number;
   addedBy: string;
 };
 
@@ -54,6 +75,8 @@ export type Trip = {
   dateLabel: string;
   startDate: string;
   endDate: string;
+  cities: CityStop[];
+  dayNotes: DayNote[];
   places: Place[];
   collaborators: Collaborator[];
 };

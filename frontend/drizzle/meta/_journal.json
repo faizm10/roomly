@@ -22,6 +22,20 @@
       "when": 1788247719473,
       "tag": "0002_trip_place_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788299634829,
+      "tag": "0003_aberrant_jackal",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788315112362,
+      "tag": "0004_rare_bullseye",
+      "breakpoints": true
     }
   ]
 }

@@ -60,11 +60,30 @@ export const tripInvitations = pgTable(
   (table) => [index("trip_invitations_trip_idx").on(table.tripId)],
 );
 
+export const tripCities = pgTable(
+  "trip_cities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    country: text("country").notNull().default(""),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("trip_cities_trip_sort_unique").on(table.tripId, table.sortOrder),
+  ],
+);
+
 export const tripPlaces = pgTable(
   "trip_places",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+    cityId: uuid("city_id").references(() => tripCities.id, { onDelete: "set null" }),
     fsqPlaceId: text("fsq_place_id").notNull(),
     name: text("name").notNull().default("Saved place"),
     address: text("address").notNull().default(""),
@@ -76,11 +95,34 @@ export const tripPlaces = pgTable(
     sourceUrl: text("source_url"),
     saved: boolean("saved").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
+    plannedDate: date("planned_date"),
+    daySortOrder: integer("day_sort_order").notNull().default(0),
     addedBy: text("added_by").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("trip_places_provider_unique").on(table.tripId, table.fsqPlaceId),
     index("trip_places_trip_sort_idx").on(table.tripId, table.sortOrder),
+    index("trip_places_day_idx").on(table.tripId, table.plannedDate, table.daySortOrder),
+    index("trip_places_city_idx").on(table.cityId),
+  ],
+);
+
+export const tripDayNotes = pgTable(
+  "trip_day_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+    cityId: uuid("city_id").references(() => tripCities.id, { onDelete: "set null" }),
+    plannedDate: date("planned_date").notNull(),
+    note: text("note").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    addedBy: text("added_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("trip_day_notes_day_idx").on(table.tripId, table.plannedDate, table.sortOrder),
+    index("trip_day_notes_city_idx").on(table.cityId),
   ],
 );
