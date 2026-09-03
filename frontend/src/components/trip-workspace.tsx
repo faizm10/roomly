@@ -58,7 +58,7 @@ import { ProfileAvatar } from "@/components/profile-avatar";
 import { TripLogisticsDialog, type TripDetails } from "@/components/trip-logistics-dialog";
 import { TripMap } from "@/components/trip-map";
 import { countryFromDestination } from "@/lib/dates";
-import { buildAppleMapsUrl, buildGoogleMapsPlaceUrl, buildGoogleMapsUrl } from "@/lib/navigation";
+import { buildAppleMapsUrl, buildGoogleMapsDirectionsUrl, buildGoogleMapsPlaceUrl, buildGoogleMapsUrl } from "@/lib/navigation";
 import { PLACE_CATEGORIES, categoryClass, isPersistedTripId, type CityStop, type Collaborator, type DayNote, type Flight, type HotelStay, type Place, type PlaceCategory, type RouteStop, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
 
 type RouteStats = { durationSeconds: number; distanceMeters: number };
@@ -967,7 +967,7 @@ function DayPlan({
               <button onClick={showCurrentDateOnMap} type="button">{activeDate === currentDate ? "Showing" : "Map this day"}</button>
             </div>
           </header>
-          {dayHotel ? <button className="hotel-strip" onClick={() => onEditHotel(dayHotel)} type="button"><span className="hotel-strip-icon"><BedDouble size={16} /></span><span><small>Home base · {dayHotel.startDate === dayHotel.endDate ? "Today" : `${formatDayHeading(dayHotel.startDate).date} — ${formatDayHeading(dayHotel.endDate).date}`}</small><strong>{dayHotel.name}</strong><em>{dayHotel.address || "Pinned on the map"}</em></span><span className="hotel-strip-route">Route starts here</span></button> : null}
+          {dayHotel ? <article className="hotel-strip"><button className="hotel-strip-copy" onClick={() => onEditHotel(dayHotel)} type="button"><span className="hotel-strip-icon"><BedDouble size={16} /></span><span><small>Home base · {dayHotel.startDate === dayHotel.endDate ? "Today" : `${formatDayHeading(dayHotel.startDate).date} — ${formatDayHeading(dayHotel.endDate).date}`}</small><strong>{dayHotel.name}</strong><em>{dayHotel.address || "Pinned on the map"}</em></span><span className="hotel-strip-route">Route starts here</span></button><a className="hotel-map-link" href={buildGoogleMapsDirectionsUrl(dayHotel)} rel="noreferrer" target="_blank">Google Maps <ExternalLink size={13} /></a></article> : null}
           {dayFlights.length ? (
             <div className="flight-list" aria-label="Flights for this day">
               {dayFlights.map(({ flight, moment }) => (
