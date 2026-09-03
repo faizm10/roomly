@@ -842,7 +842,7 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .day-plan-intro strong { display: block; margin-top: 4px; font-size: 12px; font-weight: 650; }
 .day-plan-intro button, .day-section header button { min-height: 30px; padding: 0 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 10px; font-weight: 650; cursor: pointer; }
 .day-plan-intro button:disabled { cursor: not-allowed; opacity: .38; }
-.day-plan-intro button.active, .day-section.active header button { border-color: var(--accent); background: var(--accent); color: var(--paper); }
+.day-plan-intro button.active, .day-section.active header button:not(.flight-plan-add) { border-color: var(--accent); background: var(--accent); color: var(--paper); }
 .day-pagination { display: grid; grid-template-columns: auto minmax(92px, auto) auto auto; align-items: center; border: 1px solid var(--line); background: var(--surface); }
 .day-pagination button { border: 0; border-right: 1px solid var(--line); background: transparent; }
 .day-pagination button:last-child { border-right: 0; }
@@ -851,6 +851,18 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .day-section > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .day-section > header span { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .day-section > header h2 { margin: 5px 0 0; font-size: 28px; font-weight: 650; letter-spacing: -.04em; }
+.day-section-actions { display: flex; align-items: center; gap: 7px; }
+.day-section header .flight-plan-add { display: inline-flex; align-items: center; gap: 5px; border-color: var(--ink); color: var(--ink); }
+.flight-list { display: grid; margin: 20px 0 2px; gap: 7px; }
+.flight-strip { display: grid; width: 100%; min-height: 58px; padding: 9px 12px; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
+.flight-strip:hover { border-color: var(--ink); background: var(--paper); }
+.flight-strip-icon { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--ink); border-radius: 50%; }
+.flight-strip-route, .flight-strip-times { display: grid; gap: 3px; }
+.flight-strip small { color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .055em; text-transform: uppercase; }
+.flight-strip-route strong { display: flex; align-items: center; gap: 7px; font-size: 14px; letter-spacing: -.02em; }
+.flight-strip-times { justify-items: end; text-align: right; }
+.flight-strip-times strong { font-size: 12px; font-variant-numeric: tabular-nums; }
+.flight-strip-times strong span { color: var(--muted); font-weight: 400; }
 .day-notes { margin-top: 16px; padding-left: 48px; }
 .day-note, .note-composer { display: grid; align-items: center; gap: 9px; border: 1px solid var(--line); background: var(--surface); }
 .day-note { min-height: 44px; margin-bottom: 8px; padding: 8px 9px 8px 12px; grid-template-columns: 1fr auto auto; }
@@ -996,6 +1008,13 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .selected-address { display: flex; margin: -10px 0 25px; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
 .field-label textarea { resize: vertical; }
 .field-label small { color: var(--muted); font-weight: 400; }
+.flight-dialog .eyebrow { display: flex; align-items: center; gap: 6px; }
+.flight-form { display: grid; gap: 1px; }
+.flight-form .field-label { margin-bottom: 17px; }
+.flight-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.flight-route-fields input { font-family: var(--font-mono), monospace; letter-spacing: .08em; text-transform: uppercase; }
+.flight-dialog-actions { display: flex; margin-top: 8px; align-items: center; justify-content: space-between; gap: 12px; }
+.flight-dialog-actions .button { min-height: 38px; }
 .url-input, .day-select-input { display: flex; padding-left: 13px; align-items: center; gap: 8px; border: 1px solid var(--line); }
 .url-input input, .day-select-input select { padding-left: 0; border: 0; }
 .day-select-input svg, .url-input svg { flex: none; color: var(--muted); }
@@ -1139,6 +1158,10 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
   .day-pagination { width: 100%; grid-template-columns: auto 1fr auto; }
   .day-pagination button:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); }
   .day-section > header h2 { font-size: 23px; }
+  .day-section-actions { gap: 5px; }
+  .day-section header .flight-plan-add { padding-inline: 8px; }
+  .flight-strip { grid-template-columns: 31px minmax(0, 1fr); padding: 9px; }
+  .flight-strip-times { grid-column: 2; justify-items: start; text-align: left; }
   .day-notes { padding-left: 38px; }
   .workspace-mode { width: 100%; }
   .workspace-mode button { padding-inline: 7px; font-size: 10px; }
@@ -1160,6 +1183,7 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
   .dialog-backdrop { padding: 0; align-items: flex-end; }
   .place-dialog, .nav-dialog, .invite-dialog { width: 100%; max-width: none; max-height: 94svh; padding: 20px 18px 34px; border-right: 0; border-bottom: 0; border-left: 0; }
   .place-dialog h2, .nav-dialog h2, .invite-dialog h2 { font-size: 39px; }
+  .flight-form-grid { gap: 10px; }
   .generated-invite { grid-template-columns: 1fr; }
   .generated-invite strong { max-width: calc(100vw - 72px); }
   .pending-invite { grid-template-columns: 1fr; }
