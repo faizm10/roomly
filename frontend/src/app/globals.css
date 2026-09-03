@@ -861,11 +861,21 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .note-composer input, .note-composer select { min-height: 38px; border: 0; background: transparent; font-size: 12px; outline: none; }
 .note-composer select { color: var(--muted); font-size: 10px; }
 .day-place-list { margin-top: 18px; }
+.day-reorder-hint { margin: 0 0 10px 48px; color: var(--muted); font-size: 10px; font-style: italic; }
 .day-place { position: relative; display: grid; min-height: 204px; padding: 24px 0; grid-template-columns: 34px 116px 1fr 30px; gap: 17px; border-top: 1px solid var(--line); cursor: pointer; content-visibility: auto; contain-intrinsic-size: 204px; }
 .day-place::before { position: absolute; top: -1px; left: 0; width: 0; height: 1px; background: var(--accent); content: ""; transition: width 180ms ease; }
 .day-place.selected::before { width: 100%; }
+.day-place.reorderable { cursor: grab; }
+.day-place.reorderable:active { cursor: grabbing; }
+.day-place.dragging { opacity: .42; }
+.day-place.drop-target::before { width: 100%; }
 .day-place:focus-visible { outline-offset: -3px; }
 .day-place:last-child .itinerary-rail i { background: linear-gradient(var(--line), transparent); }
+.day-reorder-controls { display: grid; overflow: hidden; border: 1px solid var(--line); }
+.day-reorder-controls button { display: grid; width: 28px; height: 21px; padding: 0; place-items: center; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.day-reorder-controls button:last-child { border-bottom: 0; }
+.day-reorder-controls button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
+.day-reorder-controls button:disabled { cursor: not-allowed; opacity: .3; }
 .day-empty { margin: 18px 0 20px 48px; color: var(--muted); font-size: 12px; }
 .unplanned-section { background: linear-gradient(90deg, transparent 0, var(--surface) 45%, transparent 100%); }
 
