@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { countryFromDestination, formatDateLabel } from "@/lib/dates";
 import { getDatabase } from "@/lib/db";
-import { tripCities, tripDayNotes, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
-import type { CityStop, Collaborator, DayNote, PlaceCategory, Trip, TripViewer } from "@/lib/types";
+import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
+import type { CityStop, Collaborator, DayNote, PlaceCategory, Trip, TripAgenda, TripViewer } from "@/lib/types";
 
 function asIsoDate(value: string | Date) {
   if (typeof value === "string") return value.slice(0, 10);
@@ -39,6 +39,11 @@ function destinationParts(destination: string) {
 function isPlanningSchemaMissing(error: unknown) {
   const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
   return /trip_cities|trip_day_notes|city_id|planned_date|day_sort_order|relation .* does not exist|column .* does not exist/i.test(message);
+}
+
+function isAgendaSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /trip_agendas|trip_agenda_day_notes|trip_agenda_items|agenda/i.test(message);
 }
 
 function isUniqueConstraintError(error: unknown) {
@@ -91,6 +96,7 @@ function toTrip(row: {
   placeCount?: number;
   cities?: CityStop[];
   dayNotes?: DayNote[];
+  agenda?: TripAgenda;
   collaborators?: Collaborator[];
 }): Trip {
   const startDate = row.startDate ? asIsoDate(row.startDate) : "";
@@ -107,6 +113,7 @@ function toTrip(row: {
     endDate,
     cities,
     dayNotes: row.dayNotes ?? [],
+    agenda: row.agenda ?? { brief: "", dayNotes: [], items: [] },
     places: Array.from({ length: placeCount }, (_, index) => ({
       id: `${row.id}-place-${index}`,
       fsqPlaceId: "",
@@ -409,6 +416,48 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
       sortOrder: note.sortOrder,
       addedBy: namesByUser.get(note.addedBy) || note.addedBy,
     }));
+  }
+  try {
+    const [agendaRows, agendaDayNotes, agendaItems] = await Promise.all([
+      db
+        .select({ brief: tripAgendas.brief })
+        .from(tripAgendas)
+        .where(eq(tripAgendas.tripId, tripId))
+        .limit(1),
+      db
+        .select({ id: tripAgendaDayNotes.id, plannedDate: tripAgendaDayNotes.plannedDate, note: tripAgendaDayNotes.note })
+        .from(tripAgendaDayNotes)
+        .where(eq(tripAgendaDayNotes.tripId, tripId))
+        .orderBy(tripAgendaDayNotes.plannedDate),
+      db
+        .select({
+          id: tripAgendaItems.id,
+          plannedDate: tripAgendaItems.plannedDate,
+          startTime: tripAgendaItems.startTime,
+          placeId: tripAgendaItems.placeId,
+          title: tripAgendaItems.title,
+          completed: tripAgendaItems.completed,
+          sortOrder: tripAgendaItems.sortOrder,
+        })
+        .from(tripAgendaItems)
+        .where(eq(tripAgendaItems.tripId, tripId))
+        .orderBy(tripAgendaItems.plannedDate, tripAgendaItems.sortOrder),
+    ]);
+    trip.agenda = {
+      brief: agendaRows[0]?.brief ?? "",
+      dayNotes: agendaDayNotes.map((note) => ({ id: note.id, plannedDate: asIsoDate(note.plannedDate), note: note.note })),
+      items: agendaItems.map((item) => ({
+        id: item.id,
+        plannedDate: item.plannedDate ? asIsoDate(item.plannedDate) : null,
+        startTime: item.startTime,
+        placeId: item.placeId,
+        title: item.title,
+        completed: item.completed,
+        sortOrder: item.sortOrder,
+      })),
+    };
+  } catch (error) {
+    if (!isAgendaSchemaMissing(error)) throw error;
   }
   trip.places = savedPlaces.map((place) => ({
     id: place.id,

@@ -37,6 +37,7 @@ import {
   updatePlacePlanning as persistUpdatePlacePlanning,
 } from "@/app/trips/actions";
 import { AddPlaceDialog } from "@/components/add-place-dialog";
+import { AgendaPanel } from "@/components/agenda-panel";
 import { CityField } from "@/components/city-field";
 import { InviteDialog } from "@/components/invite-dialog";
 import { PlacePhoto } from "@/components/place-photo";
@@ -50,7 +51,7 @@ import { PLACE_CATEGORIES, categoryClass, isPersistedTripId, type CityStop, type
 type RouteStats = { durationSeconds: number; distanceMeters: number };
 type MobileView = "list" | "map";
 type SaveState = "idle" | "saving" | "saved" | "error";
-type WorkspaceMode = "saved" | "day";
+type WorkspaceMode = "saved" | "day" | "agenda";
 
 function plannersFor(collaborators: Collaborator[], viewer?: TripViewer): Collaborator[] {
   const self = viewer ? { id: viewer.id, name: viewer.name, image: viewer.image } : null;
@@ -169,7 +170,7 @@ export function TripWorkspace({
   );
   const selected = places.find((place) => place.id === selectedId);
   const mapPlaces = useMemo(() => {
-    if (workspaceMode === "day" && activeDate) {
+    if ((workspaceMode === "day" || workspaceMode === "agenda") && activeDate) {
       return cityScopedPlaces.filter((place) => place.plannedDate === activeDate);
     }
     return cityScopedPlaces;
@@ -467,6 +468,7 @@ export function TripWorkspace({
           <div className="workspace-mode" role="tablist" aria-label="Planning mode">
             <button role="tab" aria-selected={workspaceMode === "saved"} className={workspaceMode === "saved" ? "active" : ""} onClick={() => { setWorkspaceMode("saved"); setActiveDate(null); }} type="button"><Bookmark size={14} /> Saved places</button>
             <button role="tab" aria-selected={workspaceMode === "day"} className={workspaceMode === "day" ? "active" : ""} onClick={() => setWorkspaceMode("day")} type="button"><CalendarDays size={14} /> Day plan</button>
+            <button role="tab" aria-selected={workspaceMode === "agenda"} className={workspaceMode === "agenda" ? "active" : ""} onClick={() => setWorkspaceMode("agenda")} type="button"><FileText size={14} /> Agenda</button>
           </div>
           <div className="city-strip" aria-label="City stops">
             <button className={activeCityId === "all" ? "active" : ""} onClick={() => setActiveCityId("all")} type="button">All stops</button>
@@ -492,13 +494,13 @@ export function TripWorkspace({
             ) : null}
             <button onClick={() => setInviteOpen(true)} type="button"><Share2 size={14} /> Invite</button>
           </div>
-          <div className="filter-scroll" aria-label="Filter places">
+          {workspaceMode !== "agenda" ? <div className="filter-scroll" aria-label="Filter places">
             <button className={`filter-pill filter-all${filter === "All" ? " active" : ""}`} onClick={() => setFilter("All")} type="button">All</button>
             {PLACE_CATEGORIES.map((item) => {
               const Icon = categoryIcons[item];
               return <button className={`filter-pill ${categoryClass(item)}${filter === item ? " active" : ""}`} onClick={() => setFilter(item)} key={item} type="button"><Icon size={13} /> {item}</button>;
             })}
-          </div>
+          </div> : null}
         </div>
 
         <div className="place-list">
@@ -551,7 +553,7 @@ export function TripWorkspace({
                 </div>
               </article>
             );
-          }) : (
+          }) : workspaceMode === "day" ? (
             <DayPlan
               activeCityId={activeCityId}
               activeDate={activeDate}
@@ -568,6 +570,17 @@ export function TripWorkspace({
               onUpdatePlanning={updatePlanning}
               places={places}
               selectedId={selectedId}
+            />
+          ) : (
+            <AgendaPanel
+              agenda={trip.agenda}
+              dates={itineraryDates}
+              onEditTrip={() => setLogisticsOpen(true)}
+              onFocusDate={(date) => setActiveDate(date)}
+              onSaveState={setSaveState}
+              persistable={persistable}
+              places={places}
+              tripId={trip.id}
             />
           )}
           {workspaceMode === "saved" && !visiblePlaces.length ? <div className="empty-filter"><p>No {filter.toLowerCase()} places yet.</p><button onClick={() => setAddOpen(true)} type="button">Add the first one <Plus size={15} /></button></div> : null}
@@ -601,7 +614,7 @@ export function TripWorkspace({
         <AddPlaceDialog
           dates={itineraryDates}
           destination={selectedCity?.name ?? details.destination}
-          initialPlannedDate={workspaceMode === "day" ? activeDate : null}
+          initialPlannedDate={workspaceMode === "day" || workspaceMode === "agenda" ? activeDate : null}
           onAdd={addPlace}
           onClose={() => setAddOpen(false)}
         />

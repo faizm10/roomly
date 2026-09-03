@@ -6,11 +6,12 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { getDatabase } from "@/lib/db";
 import { countryFromDestination } from "@/lib/dates";
-import { tripCities, tripDayNotes, tripInvitationAcceptances, tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
+import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripInvitationAcceptances, tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
 import { createInviteToken, hashInviteToken, inviteExpiresAt, inviteStatus } from "@/lib/invitations";
 import type { TripInvitationSummary } from "@/lib/types";
 import {
   addDayNoteSchema,
+  addAgendaItemSchema,
   addPlaceSchema,
   addTripCitySchema,
   createEmailInviteSchema,
@@ -19,10 +20,14 @@ import {
   inviteSchema,
   inviteTokenSchema,
   removeDayNoteSchema,
+  removeAgendaItemSchema,
   removePlaceSchema,
   removeTripCitySchema,
   revokeInviteSchema,
+  saveAgendaDayNoteSchema,
   updateDayNoteSchema,
+  updateAgendaBriefSchema,
+  updateAgendaItemSchema,
   updatePlacePlanningSchema,
   updatePlaceSchema,
   updateTripCitySchema,
@@ -73,6 +78,27 @@ function isPlanningSchemaMissing(error: unknown) {
 
 function planningMigrationError() {
   return new Error("Day planning needs the latest database migration before it can be saved.");
+}
+
+function isAgendaSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /trip_agendas|trip_agenda_day_notes|trip_agenda_items|agenda/i.test(message);
+}
+
+function agendaMigrationError() {
+  return new Error("Agenda needs the latest database migration before it can be saved.");
+}
+
+async function ensureAgendaPlace(tripId: string, placeId?: string | null) {
+  if (!placeId) return;
+  const db = getDatabase();
+  if (!db) return;
+  const [place] = await db
+    .select({ id: tripPlaces.id })
+    .from(tripPlaces)
+    .where(and(eq(tripPlaces.id, placeId), eq(tripPlaces.tripId, tripId)))
+    .limit(1);
+  if (!place) throw new Error("Choose a place saved to this trip.");
 }
 
 function inviteSchemaMigrationError() {
@@ -416,6 +442,131 @@ export async function removeDayNote(input: unknown) {
     throw error;
   }
   await db.delete(tripDayNotes).where(and(eq(tripDayNotes.id, data.noteId), eq(tripDayNotes.tripId, data.tripId)));
+  revalidateTrip(data.tripId);
+  return { demo: false };
+}
+
+export async function updateAgendaBrief(input: unknown) {
+  const viewer = await requireViewer();
+  const data = updateAgendaBriefSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    await db
+      .insert(tripAgendas)
+      .values({ tripId: data.tripId, brief: data.brief })
+      .onConflictDoUpdate({
+        target: tripAgendas.tripId,
+        set: { brief: data.brief, updatedAt: new Date() },
+      });
+  } catch (error) {
+    if (isAgendaSchemaMissing(error)) throw agendaMigrationError();
+    throw error;
+  }
+  revalidateTrip(data.tripId);
+  return { demo: false };
+}
+
+export async function saveAgendaDayNote(input: unknown) {
+  const viewer = await requireViewer();
+  const data = saveAgendaDayNoteSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    if (!data.note) {
+      await db.delete(tripAgendaDayNotes).where(and(eq(tripAgendaDayNotes.tripId, data.tripId), eq(tripAgendaDayNotes.plannedDate, data.plannedDate)));
+    } else {
+      await db
+        .insert(tripAgendaDayNotes)
+        .values({ tripId: data.tripId, plannedDate: data.plannedDate, note: data.note })
+        .onConflictDoUpdate({
+          target: [tripAgendaDayNotes.tripId, tripAgendaDayNotes.plannedDate],
+          set: { note: data.note, updatedAt: new Date() },
+        });
+    }
+  } catch (error) {
+    if (isAgendaSchemaMissing(error)) throw agendaMigrationError();
+    throw error;
+  }
+  revalidateTrip(data.tripId);
+  return { demo: false };
+}
+
+export async function addAgendaItem(input: unknown) {
+  const viewer = await requireViewer();
+  const data = addAgendaItemSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true, id: "" };
+  await requireEditor(data.tripId, viewer.id);
+  await ensureAgendaPlace(data.tripId, optionalValue(data.placeId));
+  try {
+    const dateCondition = data.plannedDate ? eq(tripAgendaItems.plannedDate, data.plannedDate) : isNull(tripAgendaItems.plannedDate);
+    const [order] = await db
+      .select({ next: sql<number>`coalesce(max(${tripAgendaItems.sortOrder}), -1) + 1` })
+      .from(tripAgendaItems)
+      .where(and(eq(tripAgendaItems.tripId, data.tripId), dateCondition));
+    const [item] = await db
+      .insert(tripAgendaItems)
+      .values({
+        tripId: data.tripId,
+        plannedDate: optionalValue(data.plannedDate),
+        startTime: optionalValue(data.startTime),
+        placeId: optionalValue(data.placeId),
+        title: data.title,
+        sortOrder: Number(order?.next ?? 0),
+      })
+      .returning({ id: tripAgendaItems.id, sortOrder: tripAgendaItems.sortOrder });
+    revalidateTrip(data.tripId);
+    return { demo: false, id: item.id, sortOrder: item.sortOrder };
+  } catch (error) {
+    if (isAgendaSchemaMissing(error)) throw agendaMigrationError();
+    throw error;
+  }
+}
+
+export async function updateAgendaItem(input: unknown) {
+  const viewer = await requireViewer();
+  const data = updateAgendaItemSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  await ensureAgendaPlace(data.tripId, optionalValue(data.placeId));
+  try {
+    const [updated] = await db
+      .update(tripAgendaItems)
+      .set({
+        plannedDate: optionalValue(data.plannedDate),
+        startTime: optionalValue(data.startTime),
+        placeId: optionalValue(data.placeId),
+        title: data.title,
+        completed: data.completed,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(tripAgendaItems.id, data.itemId), eq(tripAgendaItems.tripId, data.tripId)))
+      .returning({ id: tripAgendaItems.id });
+    if (!updated) throw new Error("This agenda item could not be updated.");
+  } catch (error) {
+    if (isAgendaSchemaMissing(error)) throw agendaMigrationError();
+    throw error;
+  }
+  revalidateTrip(data.tripId);
+  return { demo: false };
+}
+
+export async function removeAgendaItem(input: unknown) {
+  const viewer = await requireViewer();
+  const data = removeAgendaItemSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    await db.delete(tripAgendaItems).where(and(eq(tripAgendaItems.id, data.itemId), eq(tripAgendaItems.tripId, data.tripId)));
+  } catch (error) {
+    if (isAgendaSchemaMissing(error)) throw agendaMigrationError();
+    throw error;
+  }
   revalidateTrip(data.tripId);
   return { demo: false };
 }

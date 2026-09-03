@@ -61,6 +61,28 @@ export type DayNote = {
   addedBy: string;
 };
 
+export type AgendaItem = {
+  id: string;
+  plannedDate?: string | null;
+  startTime?: string | null;
+  placeId?: string | null;
+  title: string;
+  completed: boolean;
+  sortOrder: number;
+};
+
+export type AgendaDayNote = {
+  id: string;
+  plannedDate: string;
+  note: string;
+};
+
+export type TripAgenda = {
+  brief: string;
+  dayNotes: AgendaDayNote[];
+  items: AgendaItem[];
+};
+
 export type Collaborator = {
   id?: string;
   name: string;
@@ -89,6 +111,7 @@ export type Trip = {
   endDate: string;
   cities: CityStop[];
   dayNotes: DayNote[];
+  agenda: TripAgenda;
   places: Place[];
   collaborators: Collaborator[];
 };

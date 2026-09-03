@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   accountNameSchema,
+  addAgendaItemSchema,
   addDayNoteSchema,
   addPlaceSchema,
   addTripCitySchema,
@@ -10,10 +11,12 @@ import {
   directionsSchema,
   inviteTokenSchema,
   revokeInviteSchema,
+  saveAgendaDayNoteSchema,
   signInSchema,
   signUpSchema,
   updatePlacePlanningSchema,
   updateTripSchema,
+  updateAgendaBriefSchema,
 } from "@/lib/validators";
 
 describe("trip validation", () => {
@@ -114,6 +117,22 @@ describe("trip validation", () => {
       note: "Book the early train.",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a timed agenda item with an optional saved place", () => {
+    expect(addAgendaItemSchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      plannedDate: "2026-09-20",
+      startTime: "09:30",
+      placeId: "83cb9471-a356-4a42-a13f-23c6fb93bb0c",
+      title: "Meet outside the station",
+    }).success).toBe(true);
+  });
+
+  it("rejects an invalid agenda time and accepts empty shared notes", () => {
+    expect(addAgendaItemSchema.safeParse({ tripId: "210e9464-8cad-406b-96a0-b1463ce0eace", title: "Coffee", startTime: "9:30" }).success).toBe(false);
+    expect(saveAgendaDayNoteSchema.safeParse({ tripId: "210e9464-8cad-406b-96a0-b1463ce0eace", plannedDate: "2026-09-20", note: "" }).success).toBe(true);
+    expect(updateAgendaBriefSchema.safeParse({ tripId: "210e9464-8cad-406b-96a0-b1463ce0eace", brief: "Travel light." }).success).toBe(true);
   });
 
   it("accepts an email-bound trip invite", () => {

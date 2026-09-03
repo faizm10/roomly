@@ -147,3 +147,49 @@ export const tripDayNotes = pgTable(
     index("trip_day_notes_city_idx").on(table.cityId),
   ],
 );
+
+export const tripAgendas = pgTable(
+  "trip_agendas",
+  {
+    tripId: uuid("trip_id").primaryKey().references(() => trips.id, { onDelete: "cascade" }),
+    brief: text("brief").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
+export const tripAgendaDayNotes = pgTable(
+  "trip_agenda_day_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+    plannedDate: date("planned_date").notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("trip_agenda_day_notes_trip_date_unique").on(table.tripId, table.plannedDate),
+    index("trip_agenda_day_notes_trip_date_idx").on(table.tripId, table.plannedDate),
+  ],
+);
+
+export const tripAgendaItems = pgTable(
+  "trip_agenda_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+    plannedDate: date("planned_date"),
+    startTime: text("start_time"),
+    placeId: uuid("place_id").references(() => tripPlaces.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    completed: boolean("completed").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("trip_agenda_items_trip_date_idx").on(table.tripId, table.plannedDate, table.sortOrder),
+    index("trip_agenda_items_place_idx").on(table.placeId),
+  ],
+);

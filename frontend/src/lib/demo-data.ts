@@ -91,6 +91,15 @@ export const demoTrips: Trip[] = [
     endDate: "2026-09-22",
     cities: [{ id: "demo-lisbon-city", name: "Lisbon", country: "Portugal", startDate: "2026-09-18", endDate: "2026-09-22", sortOrder: 0 }],
     dayNotes: [{ id: "demo-note-1", cityId: "demo-lisbon-city", plannedDate: "2026-09-18", note: "Land, drop bags, and keep dinner close to the hotel.", sortOrder: 0, addedBy: "FM" }],
+    agenda: {
+      brief: "Keep the first afternoon loose. Book dinner before the flight and leave room for long coffee stops.",
+      dayNotes: [{ id: "demo-agenda-note-1", plannedDate: "2026-09-19", note: "Walk north to south; save the tram for the hill back up." }],
+      items: [
+        { id: "demo-agenda-item-1", plannedDate: "2026-09-18", startTime: "15:30", placeId: "p-1", title: "Late lunch after check-in", completed: false, sortOrder: 0 },
+        { id: "demo-agenda-item-2", plannedDate: "2026-09-21", startTime: "19:00", placeId: "p-5", title: "Sunset dinner reservation", completed: false, sortOrder: 0 },
+        { id: "demo-agenda-item-3", plannedDate: null, startTime: null, placeId: null, title: "Download the offline map", completed: true, sortOrder: 0 },
+      ],
+    },
     places: demoPlaces,
     collaborators: [
       { name: "Faiz" },
@@ -108,6 +117,7 @@ export const demoTrips: Trip[] = [
     endDate: "2026-11-09",
     cities: [{ id: "demo-kyoto-city", name: "Kyoto", country: "Japan", startDate: "2026-11-03", endDate: "2026-11-09", sortOrder: 0 }],
     dayNotes: [],
+    agenda: { brief: "", dayNotes: [], items: [] },
     places: demoPlaces.slice(0, 3),
     collaborators: [{ name: "Faiz" }],
   },
@@ -121,6 +131,7 @@ export const demoTrips: Trip[] = [
     endDate: "2027-07-13",
     cities: [{ id: "demo-montreal-city", name: "Montréal", country: "Canada", startDate: "2027-07-10", endDate: "2027-07-13", sortOrder: 0 }],
     dayNotes: [],
+    agenda: { brief: "", dayNotes: [], items: [] },
     places: demoPlaces.slice(0, 4),
     collaborators: [
       { name: "Faiz" },
