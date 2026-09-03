@@ -136,6 +136,7 @@ describe("trip validation", () => {
     const flight = {
       tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
       plannedDate: "2026-09-20",
+      arrivalDate: "2026-09-21",
       airline: "Air Canada",
       flightNumber: "AC 836",
       departureAirport: "yyz",
