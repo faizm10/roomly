@@ -4,13 +4,15 @@ import { LocateFixed, MapPin, Minus, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CityLocation } from "@/lib/cities";
 import { buildGoogleMapsPlaceUrl } from "@/lib/navigation";
-import type { Place } from "@/lib/types";
+import type { HotelStay, Place } from "@/lib/types";
 
 const FALLBACK_CENTER: [number, number] = [-9.1393, 38.7139];
 
 type TripMapProps = {
   destination: string;
+  hotels: HotelStay[];
   places: Place[];
+  routeCoordinates: [number, number][];
   selectedId: string;
   routeActive: boolean;
   mapToken?: string;
@@ -76,6 +78,20 @@ function createPreviewCard(place: Place) {
   return card;
 }
 
+function createHotelPreviewCard(hotel: HotelStay) {
+  const card = document.createElement("div");
+  card.className = "map-preview-card hotel-preview-card";
+  const copy = document.createElement("span");
+  copy.className = "map-preview-copy";
+  const title = document.createElement("strong");
+  title.textContent = hotel.name;
+  const subtitle = document.createElement("small");
+  subtitle.textContent = hotel.address || "Home base";
+  copy.append(title, subtitle);
+  card.append(copy);
+  return card;
+}
+
 function MapPlacePreview({ place }: { place: Place }) {
   return (
     <span className="map-preview-card">
@@ -98,7 +114,11 @@ function MapPlacePreview({ place }: { place: Place }) {
   );
 }
 
-export function TripMap({ destination, places, selectedId, routeActive, mapToken, onSelect }: TripMapProps) {
+function MapHotelPreview({ hotel }: { hotel: HotelStay }) {
+  return <span className="map-preview-card hotel-preview-card"><span className="map-preview-copy"><strong>{hotel.name}</strong><small>{hotel.address || "Home base"}</small></span></span>;
+}
+
+export function TripMap({ destination, hotels, places, routeCoordinates, selectedId, routeActive, mapToken, onSelect }: TripMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("mapbox-gl").Map | null>(null);
   const mapboxRef = useRef<typeof import("mapbox-gl").default | null>(null);
@@ -178,6 +198,24 @@ export function TripMap({ destination, places, selectedId, routeActive, mapToken
     popupsRef.current.clear();
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current.clear();
+    for (const hotel of hotels) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "mapbox-marker-with-preview mapbox-hotel-marker";
+      const element = document.createElement("button");
+      element.className = "mapbox-hotel-pin";
+      element.type = "button";
+      element.ariaLabel = `Hotel: ${hotel.name}`;
+      element.textContent = "H";
+      wrapper.append(element);
+      const previewCard = createHotelPreviewCard(hotel);
+      const popup = new mapboxgl.Popup({ className: "place-map-popup", closeButton: false, closeOnClick: false, focusAfterOpen: false, maxWidth: "260px", offset: 18 }).setDOMContent(previewCard);
+      const showPreview = () => { wrapper.classList.add("preview-open"); popup.setLngLat(hotel.coordinates).addTo(map); };
+      const hidePreview = () => { wrapper.classList.remove("preview-open"); popup.remove(); };
+      element.addEventListener("mouseenter", showPreview); element.addEventListener("focus", showPreview);
+      element.addEventListener("mouseleave", hidePreview); element.addEventListener("blur", hidePreview);
+      const marker = new mapboxgl.Marker({ element: wrapper, anchor: "bottom" }).setLngLat(hotel.coordinates).addTo(map);
+      markersRef.current.set(`hotel-${hotel.id}`, marker); popupsRef.current.set(`hotel-${hotel.id}`, popup);
+    }
     for (const [index, place] of places.entries()) {
       const wrapper = document.createElement("div");
       wrapper.className = "mapbox-marker-with-preview";
@@ -230,9 +268,9 @@ export function TripMap({ destination, places, selectedId, routeActive, mapToken
     const data = {
       type: "Feature" as const,
       properties: {},
-      geometry: { type: "LineString" as const, coordinates: places.map((place) => place.coordinates) },
+      geometry: { type: "LineString" as const, coordinates: routeCoordinates },
     };
-    if (routeActive && places.length >= 2) {
+    if (routeActive && routeCoordinates.length >= 2) {
       if (source) source.setData(data);
       else {
         map.addSource("trip-route", { type: "geojson", data });
@@ -242,7 +280,7 @@ export function TripMap({ destination, places, selectedId, routeActive, mapToken
       if (map.getLayer("trip-route-line")) map.removeLayer("trip-route-line");
       map.removeSource("trip-route");
     }
-  }, [mapReady, onSelect, places, routeActive, selectedId]);
+  }, [hotels, mapReady, onSelect, places, routeActive, routeCoordinates, selectedId]);
 
   function zoom(delta: number) {
     mapRef.current?.zoomTo(mapRef.current.getZoom() + delta);
@@ -300,6 +338,7 @@ export function TripMap({ destination, places, selectedId, routeActive, mapToken
           </div>
         );
       })}
+      {hotels.map((hotel, index) => <div className="workspace-pin workspace-hotel-pin" style={positions[(index + places.length + 2) % positions.length]} key={`hotel-${hotel.id}`}><button className="workspace-pin-button" aria-label={`Hotel: ${hotel.name}`} type="button">H</button><MapHotelPreview hotel={hotel} /></div>)}
       <div className="map-demo-label">Map preview · {destination || "Add a Mapbox key for live tiles"}</div>
       <div className="map-controls"><button type="button" aria-label="Zoom in"><Plus size={17} /></button><button type="button" aria-label="Zoom out"><Minus size={17} /></button><button type="button" aria-label="Find me"><LocateFixed size={17} /></button></div>
     </div>
