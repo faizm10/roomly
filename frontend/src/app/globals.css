@@ -854,12 +854,15 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .day-section-actions { display: flex; align-items: center; gap: 7px; }
 .day-section header .flight-plan-add { display: inline-flex; align-items: center; gap: 5px; border-color: var(--ink); color: var(--ink); }
 .day-section header .hotel-stay-add { display: inline-flex; align-items: center; gap: 5px; border-color: var(--ink); background: var(--ink); color: var(--paper); }
-.hotel-strip { display: grid; width: 100%; min-height: 62px; margin-top: 18px; padding: 10px 12px; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); text-align: left; cursor: pointer; }
+.hotel-strip { display: grid; width: 100%; min-height: 62px; margin-top: 18px; padding: 10px 12px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); }
 .hotel-strip:hover { background: var(--surface); }
+.hotel-strip-copy { display: grid; min-width: 0; padding: 0; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .hotel-strip-icon { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--ink); border-radius: 50%; }
 .hotel-strip small, .hotel-strip em { display: block; color: var(--muted); font-size: 9px; font-style: normal; letter-spacing: .055em; text-transform: uppercase; }
 .hotel-strip strong { display: block; margin: 3px 0; font-size: 14px; letter-spacing: -.02em; }
 .hotel-strip-route { color: var(--muted); font-size: 10px; font-weight: 650; }
+.hotel-map-link { display: inline-flex; min-height: 30px; padding: 0 9px; align-items: center; gap: 5px; border: 1px solid var(--line); color: var(--ink); font-size: 10px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.hotel-map-link:hover { border-color: var(--ink); }
 .flight-list { display: grid; margin: 20px 0 2px; gap: 7px; }
 .flight-strip { display: grid; width: 100%; min-height: 58px; padding: 9px 12px; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
 .flight-strip:hover { border-color: var(--ink); background: var(--paper); }
@@ -1184,7 +1187,8 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
   .day-section header .flight-plan-add { padding-inline: 8px; }
   .flight-strip { grid-template-columns: 31px minmax(0, 1fr); padding: 9px; }
   .flight-strip-times { grid-column: 2; justify-items: start; text-align: left; }
-  .hotel-strip { grid-template-columns: 31px minmax(0, 1fr); padding: 9px; }
+  .hotel-strip { grid-template-columns: minmax(0, 1fr) auto; padding: 9px; }
+  .hotel-strip-copy { grid-template-columns: 31px minmax(0, 1fr); }
   .hotel-strip-route { display: none; }
   .day-notes { padding-left: 38px; }
   .workspace-mode { width: 100%; }
