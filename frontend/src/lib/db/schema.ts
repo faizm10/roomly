@@ -148,6 +148,24 @@ export const tripDayNotes = pgTable(
   ],
 );
 
+export const tripFlights = pgTable(
+  "trip_flights",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+    plannedDate: date("planned_date").notNull(),
+    airline: text("airline").notNull().default(""),
+    flightNumber: text("flight_number").notNull().default(""),
+    departureAirport: text("departure_airport").notNull(),
+    arrivalAirport: text("arrival_airport").notNull(),
+    departureTime: text("departure_time").notNull(),
+    arrivalTime: text("arrival_time").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("trip_flights_trip_date_idx").on(table.tripId, table.plannedDate, table.departureTime)],
+);
+
 export const tripAgendas = pgTable(
   "trip_agendas",
   {
