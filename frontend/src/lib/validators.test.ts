@@ -11,6 +11,7 @@ import {
   directionsSchema,
   inviteTokenSchema,
   revokeInviteSchema,
+  reorderDayPlacesSchema,
   saveAgendaDayNoteSchema,
   signInSchema,
   signUpSchema,
@@ -108,6 +109,16 @@ describe("trip validation", () => {
       daySortOrder: 1,
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a complete ordered day and rejects duplicate places", () => {
+    const input = {
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      plannedDate: "2026-09-20",
+      placeIds: ["83cb9471-a356-4a42-a13f-23c6fb93bb0c", "83cb9471-a356-4a42-a13f-23c6fb93bb0d"],
+    };
+    expect(reorderDayPlacesSchema.safeParse(input).success).toBe(true);
+    expect(reorderDayPlacesSchema.safeParse({ ...input, placeIds: [input.placeIds[0], input.placeIds[0]] }).success).toBe(false);
   });
 
   it("accepts a day note with a planned date", () => {
