@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { countryFromDestination, formatDateLabel } from "@/lib/dates";
 import { getDatabase } from "@/lib/db";
-import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripFlights, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
-import type { CityStop, Collaborator, DayNote, Flight, PlaceCategory, Trip, TripAgenda, TripViewer } from "@/lib/types";
+import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripFlights, tripHotels, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
+import type { CityStop, Collaborator, DayNote, Flight, HotelStay, PlaceCategory, Trip, TripAgenda, TripViewer } from "@/lib/types";
 
 function asIsoDate(value: string | Date) {
   if (typeof value === "string") return value.slice(0, 10);
@@ -49,6 +49,11 @@ function isAgendaSchemaMissing(error: unknown) {
 function isFlightSchemaMissing(error: unknown) {
   const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
   return /trip_flights|arrival_date|departure_airport|arrival_airport|departure_time|arrival_time|relation .* does not exist|column .* does not exist/i.test(message);
+}
+
+function isHotelSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /trip_hotels|relation .* does not exist|column .* does not exist/i.test(message);
 }
 
 function isUniqueConstraintError(error: unknown) {
@@ -102,6 +107,7 @@ function toTrip(row: {
   cities?: CityStop[];
   dayNotes?: DayNote[];
   flights?: Flight[];
+  hotels?: HotelStay[];
   agenda?: TripAgenda;
   collaborators?: Collaborator[];
 }): Trip {
@@ -120,6 +126,7 @@ function toTrip(row: {
     cities,
     dayNotes: row.dayNotes ?? [],
     flights: row.flights ?? [],
+    hotels: row.hotels ?? [],
     agenda: row.agenda ?? { brief: "", dayNotes: [], items: [] },
     places: Array.from({ length: placeCount }, (_, index) => ({
       id: `${row.id}-place-${index}`,
@@ -447,6 +454,19 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
     }));
   } catch (error) {
     if (!isFlightSchemaMissing(error)) throw error;
+  }
+  try {
+    const hotels = await db.select({
+      id: tripHotels.id, cityId: tripHotels.cityId, name: tripHotels.name, address: tripHotels.address,
+      longitude: tripHotels.longitude, latitude: tripHotels.latitude, startDate: tripHotels.startDate, endDate: tripHotels.endDate,
+    }).from(tripHotels).where(eq(tripHotels.tripId, tripId)).orderBy(tripHotels.startDate);
+    trip.hotels = hotels.map((hotel) => ({
+      id: hotel.id, cityId: hotel.cityId, name: hotel.name, address: hotel.address,
+      coordinates: [Number(hotel.longitude), Number(hotel.latitude)] as [number, number],
+      startDate: asIsoDate(hotel.startDate), endDate: asIsoDate(hotel.endDate),
+    }));
+  } catch (error) {
+    if (!isHotelSchemaMissing(error)) throw error;
   }
   try {
     const [agendaRows, agendaDayNotes, agendaItems] = await Promise.all([
