@@ -119,6 +119,31 @@ export const removeDayNoteSchema = z.object({
 
 const optionalAgendaDate = z.iso.date().optional().or(z.literal(""));
 const optionalAgendaTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().or(z.literal(""));
+const flightTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+const airportCode = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Use a three-letter airport code.");
+
+const flightFields = {
+  tripId: z.string().uuid(),
+  plannedDate: z.iso.date(),
+  airline: z.string().trim().max(80).default(""),
+  flightNumber: z.string().trim().max(20).default(""),
+  departureAirport: airportCode,
+  arrivalAirport: airportCode,
+  departureTime: flightTime,
+  arrivalTime: flightTime,
+};
+
+export const addFlightSchema = z.object(flightFields);
+
+export const updateFlightSchema = z.object({
+  ...flightFields,
+  flightId: z.string().uuid(),
+});
+
+export const removeFlightSchema = z.object({
+  tripId: z.string().uuid(),
+  flightId: z.string().uuid(),
+});
 
 export const updateAgendaBriefSchema = z.object({
   tripId: z.string().uuid(),
