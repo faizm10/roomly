@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   accountNameSchema,
+  addFlightSchema,
   addAgendaItemSchema,
   addDayNoteSchema,
   addPlaceSchema,
@@ -18,6 +19,7 @@ import {
   updatePlacePlanningSchema,
   updateTripSchema,
   updateAgendaBriefSchema,
+  updateFlightSchema,
 } from "@/lib/validators";
 
 describe("trip validation", () => {
@@ -128,6 +130,24 @@ describe("trip validation", () => {
       note: "Book the early train.",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a compact flight plan and normalizes airport codes", () => {
+    const flight = {
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      plannedDate: "2026-09-20",
+      airline: "Air Canada",
+      flightNumber: "AC 836",
+      departureAirport: "yyz",
+      arrivalAirport: "nrt",
+      departureTime: "12:45",
+      arrivalTime: "15:20",
+    };
+    const result = addFlightSchema.safeParse(flight);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.departureAirport).toBe("YYZ");
+    expect(updateFlightSchema.safeParse({ ...flight, flightId: "83cb9471-a356-4a42-a13f-23c6fb93bb0c" }).success).toBe(true);
+    expect(addFlightSchema.safeParse({ ...flight, arrivalAirport: "Tokyo", departureTime: "9:30" }).success).toBe(false);
   });
 
   it("accepts a timed agenda item with an optional saved place", () => {
