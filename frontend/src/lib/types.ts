@@ -73,6 +73,22 @@ export type Flight = {
   arrivalTime: string;
 };
 
+export type HotelStay = {
+  id: string;
+  cityId?: string | null;
+  name: string;
+  address: string;
+  coordinates: [longitude: number, latitude: number];
+  startDate: string;
+  endDate: string;
+};
+
+export type RouteStop = {
+  id: string;
+  name: string;
+  coordinates: [longitude: number, latitude: number];
+};
+
 export type AgendaItem = {
   id: string;
   plannedDate?: string | null;
@@ -124,6 +140,7 @@ export type Trip = {
   cities: CityStop[];
   dayNotes: DayNote[];
   flights: Flight[];
+  hotels: HotelStay[];
   agenda: TripAgenda;
   places: Place[];
   collaborators: Collaborator[];
