@@ -6,6 +6,11 @@ export function buildGoogleMapsPlaceUrl(place: Place) {
   return `https://www.google.com/maps/search/?${params.toString()}`;
 }
 
+export function buildGoogleMapsDirectionsUrl(destination: Pick<RouteStop, "coordinates">) {
+  const [lng, lat] = destination.coordinates;
+  return `https://www.google.com/maps/dir/?${new URLSearchParams({ api: "1", destination: `${lat},${lng}` }).toString()}`;
+}
+
 export function buildGoogleMapsUrl(places: Array<Pick<RouteStop, "coordinates">>, mode: TravelMode) {
   const [origin, ...rest] = places;
   const destination = rest.at(-1) ?? origin;
