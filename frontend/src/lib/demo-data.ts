@@ -91,7 +91,7 @@ export const demoTrips: Trip[] = [
     endDate: "2026-09-22",
     cities: [{ id: "demo-lisbon-city", name: "Lisbon", country: "Portugal", startDate: "2026-09-18", endDate: "2026-09-22", sortOrder: 0 }],
     dayNotes: [{ id: "demo-note-1", cityId: "demo-lisbon-city", plannedDate: "2026-09-18", note: "Land, drop bags, and keep dinner close to the hotel.", sortOrder: 0, addedBy: "FM" }],
-    flights: [{ id: "demo-flight-lisbon", plannedDate: "2026-09-18", airline: "TAP Air Portugal", flightNumber: "TP 258", departureAirport: "YYZ", arrivalAirport: "LIS", departureTime: "10:15", arrivalTime: "21:30" }],
+    flights: [{ id: "demo-flight-lisbon", plannedDate: "2026-09-18", arrivalDate: "2026-09-19", airline: "TAP Air Portugal", flightNumber: "TP 258", departureAirport: "YYZ", arrivalAirport: "LIS", departureTime: "10:15", arrivalTime: "21:30" }],
     agenda: {
       brief: "Keep the first afternoon loose. Book dinner before the flight and leave room for long coffee stops.",
       dayNotes: [{ id: "demo-agenda-note-1", plannedDate: "2026-09-19", note: "Walk north to south; save the tram for the hill back up." }],
