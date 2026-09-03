@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoPlaces } from "@/lib/demo-data";
-import { buildAppleMapsUrl, buildGoogleMapsUrl } from "@/lib/navigation";
+import { buildAppleMapsUrl, buildGoogleMapsDirectionsUrl, buildGoogleMapsUrl } from "@/lib/navigation";
 
 describe("navigation handoff URLs", () => {
   it("builds a Google route with origin, waypoints and destination", () => {
@@ -16,5 +16,11 @@ describe("navigation handoff URLs", () => {
     expect(url.searchParams.get("daddr")).toContain(",");
     expect(url.searchParams.get("dirflg")).toBe("w");
     expect(url.searchParams.get("saddr")).toContain(",");
+  });
+
+  it("builds hotel directions from the current location", () => {
+    const url = new URL(buildGoogleMapsDirectionsUrl(demoPlaces[0]));
+    expect(url.pathname).toContain("/maps/dir/");
+    expect(url.searchParams.get("destination")).toContain(",");
   });
 });
