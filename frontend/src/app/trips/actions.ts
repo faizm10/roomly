@@ -22,6 +22,7 @@ import {
   removeDayNoteSchema,
   removeAgendaItemSchema,
   removePlaceSchema,
+  reorderDayPlacesSchema,
   removeTripCitySchema,
   revokeInviteSchema,
   saveAgendaDayNoteSchema,
@@ -272,6 +273,36 @@ export async function updatePlacePlanning(input: unknown) {
     .where(and(eq(tripPlaces.id, data.placeId), eq(tripPlaces.tripId, data.tripId)))
     .returning({ id: tripPlaces.id });
   if (!updated) throw new Error("This place could not be updated.");
+  revalidateTrip(data.tripId);
+  return { demo: false };
+}
+
+export async function reorderDayPlaces(input: unknown) {
+  const viewer = await requireViewer();
+  const data = reorderDayPlacesSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    const dayPlaces = await db
+      .select({ id: tripPlaces.id })
+      .from(tripPlaces)
+      .where(and(eq(tripPlaces.tripId, data.tripId), eq(tripPlaces.plannedDate, data.plannedDate)));
+    const expected = new Set(dayPlaces.map((place) => place.id));
+    if (expected.size !== data.placeIds.length || data.placeIds.some((id) => !expected.has(id))) {
+      throw new Error("This day changed before the new order could be saved. Refresh and try again.");
+    }
+    const updates = data.placeIds.map((placeId, daySortOrder) => db
+        .update(tripPlaces)
+        .set({ daySortOrder })
+        .where(and(eq(tripPlaces.id, placeId), eq(tripPlaces.tripId, data.tripId), eq(tripPlaces.plannedDate, data.plannedDate))));
+    const [firstUpdate, ...remainingUpdates] = updates;
+    if (!firstUpdate) throw new Error("Choose at least one place to reorder.");
+    await db.batch([firstUpdate, ...remainingUpdates]);
+  } catch (error) {
+    if (isPlanningSchemaMissing(error)) throw planningMigrationError();
+    throw error;
+  }
   revalidateTrip(data.tripId);
   return { demo: false };
 }
