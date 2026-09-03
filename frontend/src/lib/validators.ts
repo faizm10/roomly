@@ -146,6 +146,26 @@ export const removeFlightSchema = z.object({
   flightId: z.string().uuid(),
 });
 
+const hotelStayFields = {
+  tripId: z.string().uuid(),
+  cityId: z.string().uuid().optional().or(z.literal("")),
+  name: z.string().trim().min(2).max(160),
+  address: z.string().trim().max(300).default(""),
+  longitude: z.number().min(-180).max(180),
+  latitude: z.number().min(-90).max(90),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
+};
+
+export const addHotelStaySchema = z.object(hotelStayFields).refine((stay) => stay.endDate >= stay.startDate, {
+  message: "The last hotel day must be on or after the first.",
+  path: ["endDate"],
+});
+
+export const updateHotelStaySchema = addHotelStaySchema.extend({ hotelId: z.string().uuid() });
+
+export const removeHotelStaySchema = z.object({ tripId: z.string().uuid(), hotelId: z.string().uuid() });
+
 export const updateAgendaBriefSchema = z.object({
   tripId: z.string().uuid(),
   brief: z.string().trim().max(5000),
