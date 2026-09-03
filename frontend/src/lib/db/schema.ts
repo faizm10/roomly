@@ -154,6 +154,7 @@ export const tripFlights = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
     plannedDate: date("planned_date").notNull(),
+    arrivalDate: date("arrival_date").notNull(),
     airline: text("airline").notNull().default(""),
     flightNumber: text("flight_number").notNull().default(""),
     departureAirport: text("departure_airport").notNull(),
