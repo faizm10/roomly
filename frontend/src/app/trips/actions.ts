@@ -95,7 +95,7 @@ function agendaMigrationError() {
 
 function isFlightSchemaMissing(error: unknown) {
   const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
-  return /trip_flights|departure_airport|arrival_airport|departure_time|arrival_time|relation .* does not exist|column .* does not exist/i.test(message);
+  return /trip_flights|arrival_date|departure_airport|arrival_airport|departure_time|arrival_time|relation .* does not exist|column .* does not exist/i.test(message);
 }
 
 function flightMigrationError() {
@@ -519,6 +519,7 @@ export async function updateFlight(input: unknown) {
       .update(tripFlights)
       .set({
         plannedDate: data.plannedDate,
+        arrivalDate: data.arrivalDate,
         airline: data.airline,
         flightNumber: data.flightNumber,
         departureAirport: data.departureAirport,
