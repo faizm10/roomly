@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   accountNameSchema,
   addFlightSchema,
+  addHotelStaySchema,
   addAgendaItemSchema,
   addDayNoteSchema,
   addPlaceSchema,
@@ -149,6 +150,21 @@ describe("trip validation", () => {
     if (result.success) expect(result.data.departureAirport).toBe("YYZ");
     expect(updateFlightSchema.safeParse({ ...flight, flightId: "83cb9471-a356-4a42-a13f-23c6fb93bb0c" }).success).toBe(true);
     expect(addFlightSchema.safeParse({ ...flight, arrivalAirport: "Tokyo", departureTime: "9:30" }).success).toBe(false);
+  });
+
+  it("accepts a dated hotel stay and rejects an inverted stay", () => {
+    const stay = {
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      cityId: "83cb9471-a356-4a42-a13f-23c6fb93bb0d",
+      name: "Memmo Alfama",
+      address: "Travessa das Merceeiras 27, Lisbon",
+      longitude: -9.1308,
+      latitude: 38.7119,
+      startDate: "2026-09-18",
+      endDate: "2026-09-22",
+    };
+    expect(addHotelStaySchema.safeParse(stay).success).toBe(true);
+    expect(addHotelStaySchema.safeParse({ ...stay, endDate: "2026-09-17" }).success).toBe(false);
   });
 
   it("accepts a timed agenda item with an optional saved place", () => {
