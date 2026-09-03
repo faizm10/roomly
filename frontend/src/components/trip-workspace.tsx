@@ -174,7 +174,9 @@ export function TripWorkspace({
   const selected = places.find((place) => place.id === selectedId);
   const mapPlaces = useMemo(() => {
     if (workspaceMode === "day" && activeDate) {
-      return cityScopedPlaces.filter((place) => place.plannedDate === activeDate);
+      return cityScopedPlaces
+        .filter((place) => place.plannedDate === activeDate)
+        .toSorted((left, right) => (left.daySortOrder ?? 0) - (right.daySortOrder ?? 0));
     }
     return cityScopedPlaces;
   }, [activeDate, cityScopedPlaces, workspaceMode]);
