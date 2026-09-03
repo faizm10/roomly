@@ -122,14 +122,14 @@ async function ensureHotelCity(tripId: string, cityId?: string | null) {
   if (!city) throw new Error("Choose a city on this trip.");
 }
 
-async function ensureHotelDatesAvailable(tripId: string, startDate: string, endDate: string, excludingId?: string) {
+async function ensureHotelDatesAvailable(tripId: string, startDate: string, endDate: string, cityId?: string | null, excludingId?: string) {
   const db = getDatabase();
   if (!db) return;
   const stays = await db
-    .select({ id: tripHotels.id })
+    .select({ id: tripHotels.id, cityId: tripHotels.cityId })
     .from(tripHotels)
     .where(and(eq(tripHotels.tripId, tripId), lte(tripHotels.startDate, endDate), gte(tripHotels.endDate, startDate)));
-  if (stays.some((stay) => stay.id !== excludingId)) throw new Error("Those hotel dates overlap another stay.");
+  if (stays.some((stay) => stay.id !== excludingId && stay.cityId === cityId)) throw new Error("Those dates overlap another hotel in this city.");
 }
 
 async function ensureAgendaPlace(tripId: string, placeId?: string | null) {
@@ -593,7 +593,7 @@ export async function addHotelStay(input: unknown) {
   await requireEditor(data.tripId, viewer.id);
   try {
     await ensureHotelCity(data.tripId, optionalValue(data.cityId));
-    await ensureHotelDatesAvailable(data.tripId, data.startDate, data.endDate);
+    await ensureHotelDatesAvailable(data.tripId, data.startDate, data.endDate, optionalValue(data.cityId));
     const [stay] = await db.insert(tripHotels).values({ ...data, cityId: optionalValue(data.cityId) }).returning({ id: tripHotels.id });
     revalidateTrip(data.tripId);
     return { demo: false, id: stay.id };
@@ -611,7 +611,7 @@ export async function updateHotelStay(input: unknown) {
   await requireEditor(data.tripId, viewer.id);
   try {
     await ensureHotelCity(data.tripId, optionalValue(data.cityId));
-    await ensureHotelDatesAvailable(data.tripId, data.startDate, data.endDate, data.hotelId);
+    await ensureHotelDatesAvailable(data.tripId, data.startDate, data.endDate, optionalValue(data.cityId), data.hotelId);
     const [stay] = await db.update(tripHotels).set({
       cityId: optionalValue(data.cityId), name: data.name, address: data.address,
       longitude: data.longitude, latitude: data.latitude, startDate: data.startDate, endDate: data.endDate, updatedAt: new Date(),
