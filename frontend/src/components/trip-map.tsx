@@ -1,7 +1,7 @@
 "use client";
 
 import { LocateFixed, MapPin, Minus, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CityLocation } from "@/lib/cities";
 import { buildGoogleMapsPlaceUrl } from "@/lib/navigation";
 import type { HotelStay, Place } from "@/lib/types";
@@ -128,6 +128,12 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
   const initialDestinationRef = useRef(destination);
   const [mapReady, setMapReady] = useState(false);
   const unplannedCount = places.filter((place) => !place.plannedDate).length;
+  const routeSignature = routeCoordinates.map(([lng, lat]) => `${lng},${lat}`).join("|");
+  const routeData = useMemo(() => ({
+    type: "Feature" as const,
+    properties: {},
+    geometry: { type: "LineString" as const, coordinates: routeSignature ? routeSignature.split("|").map((pair) => pair.split(",").map(Number) as [number, number]) : [] },
+  }), [routeSignature]);
 
   useEffect(() => {
     if (!mapToken || !containerRef.current) return;
@@ -266,23 +272,23 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
       popupsRef.current.set(place.id, popup);
     }
 
+  }, [hotels, mapReady, onSelect, places, selectedId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
     const source = map.getSource("trip-route") as import("mapbox-gl").GeoJSONSource | undefined;
-    const data = {
-      type: "Feature" as const,
-      properties: {},
-      geometry: { type: "LineString" as const, coordinates: routeCoordinates },
-    };
-    if (routeActive && routeCoordinates.length >= 2) {
-      if (source) source.setData(data);
+    if (routeActive && routeData.geometry.coordinates.length >= 2) {
+      if (source) source.setData(routeData);
       else {
-        map.addSource("trip-route", { type: "geojson", data });
+        map.addSource("trip-route", { type: "geojson", data: routeData });
         map.addLayer({ id: "trip-route-line", type: "line", source: "trip-route", paint: { "line-color": "#111111", "line-width": 4, "line-dasharray": [0.8, 1.6] } });
       }
     } else if (source) {
       if (map.getLayer("trip-route-line")) map.removeLayer("trip-route-line");
       map.removeSource("trip-route");
     }
-  }, [hotels, mapReady, onSelect, places, routeActive, routeCoordinates, selectedId]);
+  }, [mapReady, routeActive, routeData]);
 
   function zoom(delta: number) {
     mapRef.current?.zoomTo(mapRef.current.getZoom() + delta);
