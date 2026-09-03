@@ -125,6 +125,7 @@ const airportCode = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Use a t
 const flightFields = {
   tripId: z.string().uuid(),
   plannedDate: z.iso.date(),
+  arrivalDate: z.iso.date(),
   airline: z.string().trim().max(80).default(""),
   flightNumber: z.string().trim().max(20).default(""),
   departureAirport: airportCode,
