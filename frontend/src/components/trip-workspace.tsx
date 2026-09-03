@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowRight,
   BedDouble,
   Bike,
   Bookmark,
@@ -18,6 +19,7 @@ import {
   MoreHorizontal,
   Navigation,
   Plus,
+  Plane,
   Route,
   Share2,
   ShoppingBag,
@@ -29,19 +31,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   addDayNote as persistAddDayNote,
+  addFlight as persistAddFlight,
   addPlace as persistPlace,
   addTripCity as persistAddTripCity,
   reorderDayPlaces as persistReorderDayPlaces,
   removeDayNote as persistRemoveDayNote,
+  removeFlight as persistRemoveFlight,
   removePlace as persistRemovePlace,
   removeTripCity as persistRemoveTripCity,
   updateDayNote as persistUpdateDayNote,
+  updateFlight as persistUpdateFlight,
   updatePlace as persistUpdatePlace,
   updatePlacePlanning as persistUpdatePlacePlanning,
 } from "@/app/trips/actions";
 import { AddPlaceDialog } from "@/components/add-place-dialog";
 import { AgendaPanel } from "@/components/agenda-panel";
 import { CityField } from "@/components/city-field";
+import { FlightPlanDialog, type FlightDraft } from "@/components/flight-plan-dialog";
 import { InviteDialog } from "@/components/invite-dialog";
 import { PlacePhoto } from "@/components/place-photo";
 import { ProfileAvatar } from "@/components/profile-avatar";
@@ -49,7 +55,7 @@ import { TripLogisticsDialog, type TripDetails } from "@/components/trip-logisti
 import { TripMap } from "@/components/trip-map";
 import { countryFromDestination } from "@/lib/dates";
 import { buildAppleMapsUrl, buildGoogleMapsPlaceUrl, buildGoogleMapsUrl } from "@/lib/navigation";
-import { PLACE_CATEGORIES, categoryClass, isPersistedTripId, type CityStop, type Collaborator, type DayNote, type Place, type PlaceCategory, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
+import { PLACE_CATEGORIES, categoryClass, isPersistedTripId, type CityStop, type Collaborator, type DayNote, type Flight, type Place, type PlaceCategory, type TravelMode, type Trip, type TripViewer } from "@/lib/types";
 
 type RouteStats = { durationSeconds: number; distanceMeters: number };
 type MobileView = "list" | "map";
@@ -122,6 +128,7 @@ export function TripWorkspace({
   const [places, setPlaces] = useState(trip.places);
   const [cities, setCities] = useState(trip.cities);
   const [dayNotes, setDayNotes] = useState(trip.dayNotes);
+  const [flights, setFlights] = useState(trip.flights);
   const [details, setDetails] = useState<TripDetails>({
     title: trip.title,
     destination: trip.destination,
@@ -140,6 +147,7 @@ export function TripWorkspace({
   const [cityOpen, setCityOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [logisticsOpen, setLogisticsOpen] = useState(false);
+  const [flightEditor, setFlightEditor] = useState<Flight | "new" | null>(null);
   const [routeMode, setRouteMode] = useState<TravelMode | null>(null);
   const [routeStats, setRouteStats] = useState<RouteStats | null>(null);
   const [navOpen, setNavOpen] = useState(false);
@@ -149,6 +157,7 @@ export function TripWorkspace({
   const persistedIds = useRef(new Map<string, string>());
   const localCityCounter = useRef(0);
   const localNoteCounter = useRef(0);
+  const localFlightCounter = useRef(0);
   const persistable = isPersistedTripId(trip.id);
   const primaryCity = cities[0];
   const selectedCity = activeCityId === "all" ? primaryCity : cities.find((city) => city.id === activeCityId) ?? primaryCity;
@@ -468,6 +477,53 @@ export function TripWorkspace({
     });
   }
 
+  function saveFlight(draft: FlightDraft) {
+    const existing = flightEditor !== "new" ? flightEditor : null;
+    const previous = flights;
+    if (existing) {
+      const next = { ...existing, ...draft };
+      setFlights((current) => current.map((flight) => flight.id === existing.id ? next : flight));
+      if (!persistable || existing.id.startsWith("local-")) return;
+      enqueuePersist(async () => {
+        try {
+          await persistUpdateFlight({ tripId: trip.id, flightId: existing.id, ...draft });
+        } catch (error) {
+          setFlights(previous);
+          throw error;
+        }
+      });
+      return;
+    }
+    localFlightCounter.current += 1;
+    const next: Flight = { id: `local-flight-${localFlightCounter.current}`, ...draft };
+    setFlights((current) => [...current, next]);
+    if (!persistable) return;
+    enqueuePersist(async () => {
+      try {
+        const saved = await persistAddFlight({ tripId: trip.id, ...draft });
+        if (!("id" in saved) || !saved.id) return;
+        setFlights((current) => current.map((flight) => flight.id === next.id ? { ...flight, id: saved.id } : flight));
+      } catch (error) {
+        setFlights((current) => current.filter((flight) => flight.id !== next.id));
+        throw error;
+      }
+    });
+  }
+
+  function removeFlight(id: string) {
+    const previous = flights;
+    setFlights((current) => current.filter((flight) => flight.id !== id));
+    if (!persistable || id.startsWith("local-")) return;
+    enqueuePersist(async () => {
+      try {
+        await persistRemoveFlight({ tripId: trip.id, flightId: id });
+      } catch (error) {
+        setFlights(previous);
+        throw error;
+      }
+    });
+  }
+
   const activeRouteStats = routeMode && mapPlaces.length >= 2 ? routeStats : null;
   const minutes = activeRouteStats ? Math.max(1, Math.round(activeRouteStats.durationSeconds / 60)) : null;
   const kilometers = activeRouteStats ? (activeRouteStats.distanceMeters / 1000).toFixed(1) : null;
@@ -584,9 +640,12 @@ export function TripWorkspace({
               cities={cities}
               dates={itineraryDates}
               dayNotes={dayNotes}
+              flights={flights}
               filter={filter}
               onAddNote={addNote}
               onFocusDate={setActiveDate}
+              onAddFlight={() => setFlightEditor("new")}
+              onEditFlight={(flight) => setFlightEditor(flight)}
               onRemoveNote={removeNote}
               onSelectPlace={selectPlace}
               onReorderDay={reorderDay}
@@ -641,6 +700,16 @@ export function TripWorkspace({
         />
       ) : null}
       {cityOpen ? <AddCityDialog details={details} onAdd={addCity} onClose={() => setCityOpen(false)} /> : null}
+      {flightEditor ? (
+        <FlightPlanDialog
+          dates={itineraryDates}
+          flight={flightEditor === "new" ? null : flightEditor}
+          initialDate={activeDate ?? itineraryDates[0] ?? ""}
+          onClose={() => setFlightEditor(null)}
+          onDelete={removeFlight}
+          onSave={saveFlight}
+        />
+      ) : null}
       {inviteOpen ? <InviteDialog demo={!persistable} onClose={() => setInviteOpen(false)} tripId={trip.id} /> : null}
       {logisticsOpen ? (
         <TripLogisticsDialog
@@ -709,8 +778,11 @@ function DayPlan({
   cities,
   dates,
   dayNotes,
+  flights,
   filter,
   onAddNote,
+  onAddFlight,
+  onEditFlight,
   onFocusDate,
   onReorderDay,
   onRemoveNote,
@@ -726,8 +798,11 @@ function DayPlan({
   cities: CityStop[];
   dates: string[];
   dayNotes: DayNote[];
+  flights: Flight[];
   filter: PlaceCategory | "All";
   onAddNote: (plannedDate: string, note: string, cityId: string) => void;
+  onAddFlight: () => void;
+  onEditFlight: (flight: Flight) => void;
   onFocusDate: (plannedDate: string | null) => void;
   onRemoveNote: (noteId: string) => void;
   onSelectPlace: (placeId: string) => void;
@@ -752,6 +827,11 @@ function DayPlan({
     ? dayNotes
       .filter((note) => note.plannedDate === currentDate && cityMatches(note.cityId))
       .sort((left, right) => left.sortOrder - right.sortOrder)
+    : [];
+  const dayFlights = currentDate
+    ? flights
+      .filter((flight) => flight.plannedDate === currentDate)
+      .toSorted((left, right) => left.departureTime.localeCompare(right.departureTime))
     : [];
   const dayPlaces = currentDate
     ? places
@@ -810,8 +890,22 @@ function DayPlan({
               <span>{label.day}</span>
               <h2>{label.date}</h2>
             </div>
-            <button onClick={showCurrentDateOnMap} type="button">{activeDate === currentDate ? "Showing" : "Map this day"}</button>
+            <div className="day-section-actions">
+              <button className="flight-plan-add" onClick={onAddFlight} type="button"><Plane size={13} /> Flight</button>
+              <button onClick={showCurrentDateOnMap} type="button">{activeDate === currentDate ? "Showing" : "Map this day"}</button>
+            </div>
           </header>
+          {dayFlights.length ? (
+            <div className="flight-list" aria-label="Flights for this day">
+              {dayFlights.map((flight) => (
+                <button className="flight-strip" key={flight.id} onClick={() => onEditFlight(flight)} type="button">
+                  <span className="flight-strip-icon"><Plane size={16} /></span>
+                  <span className="flight-strip-route"><small>{[flight.airline, flight.flightNumber].filter(Boolean).join(" · ") || "Flight"}</small><strong>{flight.departureAirport}<ArrowRight size={14} />{flight.arrivalAirport}</strong></span>
+                  <span className="flight-strip-times"><strong>{flight.departureTime} <span>→</span> {flight.arrivalTime}</strong><small>Tap to edit</small></span>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="day-notes">
             {notes.map((note) => (
               <DayNoteRow key={note.id} note={note} onRemove={onRemoveNote} onUpdate={onUpdateNote} />
