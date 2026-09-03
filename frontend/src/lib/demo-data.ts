@@ -92,6 +92,7 @@ export const demoTrips: Trip[] = [
     cities: [{ id: "demo-lisbon-city", name: "Lisbon", country: "Portugal", startDate: "2026-09-18", endDate: "2026-09-22", sortOrder: 0 }],
     dayNotes: [{ id: "demo-note-1", cityId: "demo-lisbon-city", plannedDate: "2026-09-18", note: "Land, drop bags, and keep dinner close to the hotel.", sortOrder: 0, addedBy: "FM" }],
     flights: [{ id: "demo-flight-lisbon", plannedDate: "2026-09-18", arrivalDate: "2026-09-19", airline: "TAP Air Portugal", flightNumber: "TP 258", departureAirport: "YYZ", arrivalAirport: "LIS", departureTime: "10:15", arrivalTime: "21:30" }],
+    hotels: [{ id: "demo-hotel-lisbon", cityId: "demo-lisbon-city", name: "Memmo Alfama", address: "Travessa das Merceeiras 27, Lisbon", coordinates: [-9.1308, 38.7119], startDate: "2026-09-18", endDate: "2026-09-22" }],
     agenda: {
       brief: "Keep the first afternoon loose. Book dinner before the flight and leave room for long coffee stops.",
       dayNotes: [{ id: "demo-agenda-note-1", plannedDate: "2026-09-19", note: "Walk north to south; save the tram for the hill back up." }],
@@ -119,6 +120,7 @@ export const demoTrips: Trip[] = [
     cities: [{ id: "demo-kyoto-city", name: "Kyoto", country: "Japan", startDate: "2026-11-03", endDate: "2026-11-09", sortOrder: 0 }],
     dayNotes: [],
     flights: [],
+    hotels: [],
     agenda: { brief: "", dayNotes: [], items: [] },
     places: demoPlaces.slice(0, 3),
     collaborators: [{ name: "Faiz" }],
@@ -134,6 +136,7 @@ export const demoTrips: Trip[] = [
     cities: [{ id: "demo-montreal-city", name: "Montréal", country: "Canada", startDate: "2027-07-10", endDate: "2027-07-13", sortOrder: 0 }],
     dayNotes: [],
     flights: [],
+    hotels: [],
     agenda: { brief: "", dayNotes: [], items: [] },
     places: demoPlaces.slice(0, 4),
     collaborators: [
