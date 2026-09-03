@@ -15,5 +15,6 @@ describe("navigation handoff URLs", () => {
     expect(url.hostname).toBe("maps.apple.com");
     expect(url.searchParams.get("daddr")).toContain(",");
     expect(url.searchParams.get("dirflg")).toBe("w");
+    expect(url.searchParams.get("saddr")).toContain(",");
   });
 });
