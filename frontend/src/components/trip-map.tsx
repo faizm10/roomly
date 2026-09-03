@@ -127,6 +127,7 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
   const shownDestinationRef = useRef("");
   const initialDestinationRef = useRef(destination);
   const [mapReady, setMapReady] = useState(false);
+  const unplannedCount = places.filter((place) => !place.plannedDate).length;
 
   useEffect(() => {
     if (!mapToken || !containerRef.current) return;
@@ -220,10 +221,11 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
       const wrapper = document.createElement("div");
       wrapper.className = "mapbox-marker-with-preview";
       const element = document.createElement("button");
-      element.className = `mapbox-place-pin${place.id === selectedId ? " selected" : ""}`;
+      const unplanned = !place.plannedDate;
+      element.className = `mapbox-place-pin${unplanned ? " unplanned" : ""}${place.id === selectedId ? " selected" : ""}`;
       element.type = "button";
-      element.ariaLabel = `Select ${place.name}, ${place.category}, ${previewSubtitle(place)}`;
-      element.textContent = String(index + 1).padStart(2, "0");
+      element.ariaLabel = `Select ${place.name}, ${unplanned ? "needs a day" : `planned for ${place.plannedDate}`}, ${place.category}, ${previewSubtitle(place)}`;
+      element.textContent = unplanned ? "?" : String(index + 1).padStart(2, "0");
       element.addEventListener("click", () => onSelect(place.id));
       wrapper.append(element);
       const previewCard = createPreviewCard(place);
@@ -290,6 +292,7 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
     return (
       <div className="real-map-wrap">
         <div className="real-map" ref={containerRef} />
+        {unplannedCount ? <MapLegend count={unplannedCount} /> : null}
         <div className="map-controls"><button type="button" onClick={() => zoom(1)} aria-label="Zoom in"><Plus size={17} /></button><button type="button" onClick={() => zoom(-1)} aria-label="Zoom out"><Minus size={17} /></button></div>
       </div>
     );
@@ -322,17 +325,17 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
         const number = String(index + 1).padStart(2, "0");
         return (
           <div
-            className={`workspace-pin${selectedId === place.id ? " selected" : ""}`}
+            className={`workspace-pin${!place.plannedDate ? " unplanned" : ""}${selectedId === place.id ? " selected" : ""}`}
             style={positions[index % positions.length]}
             key={place.id}
           >
             <button
               className="workspace-pin-button"
               onClick={() => onSelect(place.id)}
-              aria-label={`Select ${place.name}, ${place.category}, ${previewSubtitle(place)}`}
+              aria-label={`Select ${place.name}, ${place.plannedDate ? `planned for ${place.plannedDate}` : "needs a day"}, ${place.category}, ${previewSubtitle(place)}`}
               type="button"
             >
-              {number}
+              {!place.plannedDate ? "?" : number}
             </button>
             <MapPlacePreview place={place} />
           </div>
@@ -340,7 +343,12 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
       })}
       {hotels.map((hotel, index) => <div className="workspace-pin workspace-hotel-pin" style={positions[(index + places.length + 2) % positions.length]} key={`hotel-${hotel.id}`}><button className="workspace-pin-button" aria-label={`Hotel: ${hotel.name}`} type="button">H</button><MapHotelPreview hotel={hotel} /></div>)}
       <div className="map-demo-label">Map preview · {destination || "Add a Mapbox key for live tiles"}</div>
+      {unplannedCount ? <MapLegend count={unplannedCount} /> : null}
       <div className="map-controls"><button type="button" aria-label="Zoom in"><Plus size={17} /></button><button type="button" aria-label="Zoom out"><Minus size={17} /></button><button type="button" aria-label="Find me"><LocateFixed size={17} /></button></div>
     </div>
   );
+}
+
+function MapLegend({ count }: { count: number }) {
+  return <aside className="map-legend" aria-label="Map legend"><span className="map-legend-key planned">01</span><span>Assigned to a day</span><span className="map-legend-key unplanned">?</span><span>{count} needs a day</span></aside>;
 }
