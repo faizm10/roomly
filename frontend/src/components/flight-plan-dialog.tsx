@@ -7,14 +7,12 @@ import type { Flight } from "@/lib/types";
 export type FlightDraft = Omit<Flight, "id">;
 
 export function FlightPlanDialog({
-  dates,
   flight,
   initialDate,
   onClose,
   onDelete,
   onSave,
 }: {
-  dates: string[];
   flight?: Flight | null;
   initialDate: string;
   onClose: () => void;
@@ -44,6 +42,7 @@ export function FlightPlanDialog({
     }
     onSave({
       plannedDate: String(form.get("plannedDate") ?? ""),
+      arrivalDate: String(form.get("arrivalDate") ?? ""),
       airline: String(form.get("airline") ?? "").trim(),
       flightNumber: String(form.get("flightNumber") ?? "").trim(),
       departureAirport,
@@ -64,12 +63,10 @@ export function FlightPlanDialog({
         <p className="eyebrow"><Plane size={13} /> Travel day</p>
         <h2 id="flight-plan-title">{flight ? "Edit flight" : "Add a flight"}</h2>
         <form className="flight-form" onSubmit={submit}>
-          <label className="field-label">
-            <span>Date</span>
-            <select defaultValue={flight?.plannedDate ?? initialDate} name="plannedDate" required>
-              {dates.map((date) => <option key={date} value={date}>{new Date(`${date}T00:00:00.000Z`).toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}</option>)}
-            </select>
-          </label>
+          <div className="flight-form-grid">
+            <label className="field-label"><span>Departs date</span><input defaultValue={flight?.plannedDate ?? initialDate} name="plannedDate" required type="date" /></label>
+            <label className="field-label"><span>Arrives date</span><input defaultValue={flight?.arrivalDate ?? initialDate} name="arrivalDate" required type="date" /></label>
+          </div>
           <div className="flight-form-grid">
             <label className="field-label"><span>Airline <small>Optional</small></span><input defaultValue={flight?.airline ?? ""} name="airline" placeholder="Air Canada" /></label>
             <label className="field-label"><span>Flight no. <small>Optional</small></span><input defaultValue={flight?.flightNumber ?? ""} name="flightNumber" placeholder="AC 836" /></label>
