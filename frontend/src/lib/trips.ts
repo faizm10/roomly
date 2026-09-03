@@ -48,7 +48,7 @@ function isAgendaSchemaMissing(error: unknown) {
 
 function isFlightSchemaMissing(error: unknown) {
   const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
-  return /trip_flights|departure_airport|arrival_airport|departure_time|arrival_time|relation .* does not exist|column .* does not exist/i.test(message);
+  return /trip_flights|arrival_date|departure_airport|arrival_airport|departure_time|arrival_time|relation .* does not exist|column .* does not exist/i.test(message);
 }
 
 function isUniqueConstraintError(error: unknown) {
@@ -429,6 +429,7 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
       .select({
         id: tripFlights.id,
         plannedDate: tripFlights.plannedDate,
+        arrivalDate: tripFlights.arrivalDate,
         airline: tripFlights.airline,
         flightNumber: tripFlights.flightNumber,
         departureAirport: tripFlights.departureAirport,
@@ -442,6 +443,7 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
     trip.flights = flights.map((flight) => ({
       ...flight,
       plannedDate: asIsoDate(flight.plannedDate),
+      arrivalDate: asIsoDate(flight.arrivalDate),
     }));
   } catch (error) {
     if (!isFlightSchemaMissing(error)) throw error;
