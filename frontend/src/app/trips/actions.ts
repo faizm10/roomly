@@ -1,17 +1,18 @@
 "use server";
 
-import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { getDatabase } from "@/lib/db";
 import { countryFromDestination } from "@/lib/dates";
-import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripFlights, tripInvitationAcceptances, tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
+import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripFlights, tripHotels, tripInvitationAcceptances, tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
 import { createInviteToken, hashInviteToken, inviteExpiresAt, inviteStatus } from "@/lib/invitations";
 import type { TripInvitationSummary } from "@/lib/types";
 import {
   addDayNoteSchema,
   addFlightSchema,
+  addHotelStaySchema,
   addAgendaItemSchema,
   addPlaceSchema,
   addTripCitySchema,
@@ -22,6 +23,7 @@ import {
   inviteTokenSchema,
   removeDayNoteSchema,
   removeFlightSchema,
+  removeHotelStaySchema,
   removeAgendaItemSchema,
   removePlaceSchema,
   reorderDayPlacesSchema,
@@ -30,6 +32,7 @@ import {
   saveAgendaDayNoteSchema,
   updateDayNoteSchema,
   updateFlightSchema,
+  updateHotelStaySchema,
   updateAgendaBriefSchema,
   updateAgendaItemSchema,
   updatePlacePlanningSchema,
@@ -100,6 +103,33 @@ function isFlightSchemaMissing(error: unknown) {
 
 function flightMigrationError() {
   return new Error("Flight plans need the latest database migration before they can be saved.");
+}
+
+function isHotelSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /trip_hotels|relation .* does not exist|column .* does not exist/i.test(message);
+}
+
+function hotelMigrationError() {
+  return new Error("Hotel stays need the latest database migration before they can be saved.");
+}
+
+async function ensureHotelCity(tripId: string, cityId?: string | null) {
+  if (!cityId) return;
+  const db = getDatabase();
+  if (!db) return;
+  const [city] = await db.select({ id: tripCities.id }).from(tripCities).where(and(eq(tripCities.id, cityId), eq(tripCities.tripId, tripId))).limit(1);
+  if (!city) throw new Error("Choose a city on this trip.");
+}
+
+async function ensureHotelDatesAvailable(tripId: string, startDate: string, endDate: string, excludingId?: string) {
+  const db = getDatabase();
+  if (!db) return;
+  const stays = await db
+    .select({ id: tripHotels.id })
+    .from(tripHotels)
+    .where(and(eq(tripHotels.tripId, tripId), lte(tripHotels.startDate, endDate), gte(tripHotels.endDate, startDate)));
+  if (stays.some((stay) => stay.id !== excludingId)) throw new Error("Those hotel dates overlap another stay.");
 }
 
 async function ensureAgendaPlace(tripId: string, placeId?: string | null) {
@@ -551,6 +581,62 @@ export async function removeFlight(input: unknown) {
     return { demo: false };
   } catch (error) {
     if (isFlightSchemaMissing(error)) throw flightMigrationError();
+    throw error;
+  }
+}
+
+export async function addHotelStay(input: unknown) {
+  const viewer = await requireViewer();
+  const data = addHotelStaySchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true, id: "" };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    await ensureHotelCity(data.tripId, optionalValue(data.cityId));
+    await ensureHotelDatesAvailable(data.tripId, data.startDate, data.endDate);
+    const [stay] = await db.insert(tripHotels).values({ ...data, cityId: optionalValue(data.cityId) }).returning({ id: tripHotels.id });
+    revalidateTrip(data.tripId);
+    return { demo: false, id: stay.id };
+  } catch (error) {
+    if (isHotelSchemaMissing(error)) throw hotelMigrationError();
+    throw error;
+  }
+}
+
+export async function updateHotelStay(input: unknown) {
+  const viewer = await requireViewer();
+  const data = updateHotelStaySchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    await ensureHotelCity(data.tripId, optionalValue(data.cityId));
+    await ensureHotelDatesAvailable(data.tripId, data.startDate, data.endDate, data.hotelId);
+    const [stay] = await db.update(tripHotels).set({
+      cityId: optionalValue(data.cityId), name: data.name, address: data.address,
+      longitude: data.longitude, latitude: data.latitude, startDate: data.startDate, endDate: data.endDate, updatedAt: new Date(),
+    }).where(and(eq(tripHotels.id, data.hotelId), eq(tripHotels.tripId, data.tripId))).returning({ id: tripHotels.id });
+    if (!stay) throw new Error("This hotel stay could not be updated.");
+    revalidateTrip(data.tripId);
+    return { demo: false };
+  } catch (error) {
+    if (isHotelSchemaMissing(error)) throw hotelMigrationError();
+    throw error;
+  }
+}
+
+export async function removeHotelStay(input: unknown) {
+  const viewer = await requireViewer();
+  const data = removeHotelStaySchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    await db.delete(tripHotels).where(and(eq(tripHotels.id, data.hotelId), eq(tripHotels.tripId, data.tripId)));
+    revalidateTrip(data.tripId);
+    return { demo: false };
+  } catch (error) {
+    if (isHotelSchemaMissing(error)) throw hotelMigrationError();
     throw error;
   }
 }
