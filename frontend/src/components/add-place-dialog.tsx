@@ -13,9 +13,11 @@ type AddPlaceDialogProps = {
   onClose: () => void;
 };
 
-function formatSaveDay(iso: string, index: number) {
+function formatSaveDay(iso: string) {
   const date = new Date(`${iso}T00:00:00.000Z`);
-  return `Day ${index + 1} · ${date.toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" })}`;
+  const weekday = date.toLocaleDateString("en", { weekday: "long", timeZone: "UTC" });
+  const calendarDate = date.toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" });
+  return `${weekday} · ${calendarDate}`;
 }
 
 export function AddPlaceDialog({ destination, initialPlannedDate, dates = [], onAdd, onClose }: AddPlaceDialogProps) {
@@ -119,7 +121,7 @@ export function AddPlaceDialog({ destination, initialPlannedDate, dates = [], on
                 <CalendarDays size={16} />
                 <select value={plannedDate} onChange={(event) => setPlannedDate(event.target.value)} aria-label="Optional planned day">
                   <option value="">Save without a day</option>
-                  {dates.map((date, index) => <option value={date} key={date}>{formatSaveDay(date, index)}</option>)}
+                  {dates.map((date) => <option value={date} key={date}>{formatSaveDay(date)}</option>)}
                 </select>
               </div>
             </label>
