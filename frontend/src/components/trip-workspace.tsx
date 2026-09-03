@@ -176,6 +176,10 @@ export function TripWorkspace({
 
   const planners = useMemo(() => plannersFor(trip.collaborators, viewer), [trip.collaborators, viewer]);
   const itineraryDates = useMemo(() => tripDates(details.startDate, details.endDate), [details.startDate, details.endDate]);
+  const planDates = useMemo(
+    () => Array.from(new Set([...itineraryDates, ...flights.flatMap((flight) => [flight.plannedDate, flight.arrivalDate])])).sort(),
+    [flights, itineraryDates],
+  );
   const visiblePlaces = useMemo(
     () => (filter === "All" ? cityScopedPlaces : cityScopedPlaces.filter((place) => place.category === filter)),
     [cityScopedPlaces, filter],
@@ -638,7 +642,7 @@ export function TripWorkspace({
               activeCityId={activeCityId}
               activeDate={activeDate}
               cities={cities}
-              dates={itineraryDates}
+              dates={planDates}
               dayNotes={dayNotes}
               flights={flights}
               filter={filter}
@@ -702,9 +706,8 @@ export function TripWorkspace({
       {cityOpen ? <AddCityDialog details={details} onAdd={addCity} onClose={() => setCityOpen(false)} /> : null}
       {flightEditor ? (
         <FlightPlanDialog
-          dates={itineraryDates}
           flight={flightEditor === "new" ? null : flightEditor}
-          initialDate={activeDate ?? itineraryDates[0] ?? ""}
+          initialDate={activeDate ?? planDates[0] ?? ""}
           onClose={() => setFlightEditor(null)}
           onDelete={removeFlight}
           onSave={saveFlight}
@@ -828,10 +831,14 @@ function DayPlan({
       .filter((note) => note.plannedDate === currentDate && cityMatches(note.cityId))
       .sort((left, right) => left.sortOrder - right.sortOrder)
     : [];
-  const dayFlights = currentDate
+  const dayFlights: { flight: Flight; moment: "departing" | "arriving" }[] = currentDate
     ? flights
-      .filter((flight) => flight.plannedDate === currentDate)
-      .toSorted((left, right) => left.departureTime.localeCompare(right.departureTime))
+      .flatMap((flight) => {
+        if (flight.plannedDate === currentDate) return [{ flight, moment: "departing" as "departing" | "arriving" }];
+        if (flight.arrivalDate === currentDate) return [{ flight, moment: "arriving" as "departing" | "arriving" }];
+        return [];
+      })
+      .toSorted((left, right) => (left.moment === "departing" ? left.flight.departureTime : left.flight.arrivalTime).localeCompare(right.moment === "departing" ? right.flight.departureTime : right.flight.arrivalTime))
     : [];
   const dayPlaces = currentDate
     ? places
@@ -897,11 +904,11 @@ function DayPlan({
           </header>
           {dayFlights.length ? (
             <div className="flight-list" aria-label="Flights for this day">
-              {dayFlights.map((flight) => (
-                <button className="flight-strip" key={flight.id} onClick={() => onEditFlight(flight)} type="button">
+              {dayFlights.map(({ flight, moment }) => (
+                <button className="flight-strip" key={`${flight.id}-${moment}`} onClick={() => onEditFlight(flight)} type="button">
                   <span className="flight-strip-icon"><Plane size={16} /></span>
-                  <span className="flight-strip-route"><small>{[flight.airline, flight.flightNumber].filter(Boolean).join(" · ") || "Flight"}</small><strong>{flight.departureAirport}<ArrowRight size={14} />{flight.arrivalAirport}</strong></span>
-                  <span className="flight-strip-times"><strong>{flight.departureTime} <span>→</span> {flight.arrivalTime}</strong><small>Tap to edit</small></span>
+                  <span className="flight-strip-route"><small>{moment === "departing" ? "Departs today" : "Arrives today"} · {[flight.airline, flight.flightNumber].filter(Boolean).join(" · ") || "Flight"}</small><strong>{flight.departureAirport}<ArrowRight size={14} />{flight.arrivalAirport}</strong></span>
+                  <span className="flight-strip-times"><strong>{flight.departureTime} <span>→</span> {flight.arrivalTime}</strong><small>{flight.plannedDate === flight.arrivalDate ? "Same day" : `Lands ${formatDayHeading(flight.arrivalDate).date}`}</small></span>
                 </button>
               ))}
             </div>
