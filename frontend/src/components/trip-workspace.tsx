@@ -150,6 +150,8 @@ export function TripWorkspace({
   const [mobileView, setMobileView] = useState<MobileView>("list");
   const [addOpen, setAddOpen] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
+  const [newCityForPlace, setNewCityForPlace] = useState(false);
+  const [newestCityId, setNewestCityId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [logisticsOpen, setLogisticsOpen] = useState(false);
   const [flightEditor, setFlightEditor] = useState<Flight | "new" | null>(null);
@@ -161,6 +163,7 @@ export function TripWorkspace({
   const navDialogRef = useRef<HTMLElement>(null);
   const persistChain = useRef(Promise.resolve());
   const persistedIds = useRef(new Map<string, string>());
+  const persistedCityIds = useRef(new Map<string, string>());
   const localCityCounter = useRef(0);
   const localNoteCounter = useRef(0);
   const localFlightCounter = useRef(0);
@@ -249,8 +252,8 @@ export function TripWorkspace({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [navOpen]);
 
-  function addPlace(place: Place) {
-    const cityId = selectedCity?.id ?? null;
+  function addPlace(place: Place, requestedCityId?: string) {
+    const cityId = requestedCityId || selectedCity?.id || null;
     const plannedDate = place.plannedDate ?? null;
     const daySortOrder = plannedDate
       ? places.filter((item) => item.plannedDate === plannedDate && item.cityId === cityId).length
@@ -265,7 +268,7 @@ export function TripWorkspace({
       try {
         const saved = await persistPlace({
           tripId: trip.id,
-          cityId: isUuid(cityId) ? cityId : "",
+          cityId: isUuid(cityId) ? cityId : persistedCityIds.current.get(cityId ?? "") ?? "",
           fsqPlaceId: next.fsqPlaceId,
           name: next.name,
           address: next.address,
@@ -378,13 +381,13 @@ export function TripWorkspace({
     });
   }
 
-  function addCity(city: Omit<CityStop, "id" | "sortOrder">) {
+  function addCity(city: Omit<CityStop, "id" | "sortOrder">): CityStop {
     localCityCounter.current += 1;
     const localId = `local-city-${localCityCounter.current}`;
     const next = { ...city, id: localId, sortOrder: cities.length };
     setCities((current) => [...current, next]);
     setActiveCityId(localId);
-    if (!persistable) return;
+    if (!persistable) return next;
     enqueuePersist(async () => {
       try {
         const saved = await persistAddTripCity({
@@ -395,6 +398,7 @@ export function TripWorkspace({
           endDate: next.endDate ?? "",
         });
         if (!("id" in saved) || !saved.id) return;
+        persistedCityIds.current.set(localId, saved.id);
         setCities((current) => current.map((cityItem) => (cityItem.id === localId ? { ...cityItem, id: saved.id } : cityItem)));
         setPlaces((current) => current.map((place) => (place.cityId === localId ? { ...place, cityId: saved.id } : place)));
         setDayNotes((current) => current.map((note) => (note.cityId === localId ? { ...note, cityId: saved.id } : note)));
@@ -405,6 +409,7 @@ export function TripWorkspace({
         throw error;
       }
     });
+    return next;
   }
 
   function removeCity(cityId: string) {
@@ -595,7 +600,7 @@ export function TripWorkspace({
           <div className="trip-title-row">
             <div><p className="eyebrow">{details.destination} · {details.dateLabel}</p><h1>{details.title}</h1></div>
             <div className="trip-header-actions">
-              <button className="icon-button trip-options" aria-label="Add a city" onClick={() => setCityOpen(true)} type="button"><MapPin size={19} /></button>
+              <button className="icon-button trip-options" aria-label="Add a city" onClick={() => { setNewCityForPlace(false); setCityOpen(true); }} type="button"><MapPin size={19} /></button>
               <button className="icon-button trip-options" aria-label="Add a place" onClick={() => setAddOpen(true)} type="button"><Plus size={19} /></button>
               <button className="icon-button trip-options" aria-label="Change where, when, and what" onClick={() => setLogisticsOpen(true)} type="button"><MoreHorizontal size={19} /></button>
             </div>
@@ -613,7 +618,7 @@ export function TripWorkspace({
                 {cities.length > 1 ? <button aria-label={`Remove ${city.name}`} onClick={() => removeCity(city.id)} type="button"><X size={12} /></button> : null}
               </span>
             ))}
-            <button className="city-add" onClick={() => setCityOpen(true)} type="button"><Plus size={13} /> Stop</button>
+            <button className="city-add" onClick={() => { setNewCityForPlace(false); setCityOpen(true); }} type="button"><Plus size={13} /> Stop</button>
           </div>
           <div className="collab-row">
             <div className="mini-avatars">
@@ -750,14 +755,19 @@ export function TripWorkspace({
       <button className="mobile-add-button" onClick={() => setAddOpen(true)} aria-label="Add a place" type="button"><Plus size={22} /></button>
       {addOpen ? (
         <AddPlaceDialog
+          cities={cities}
           dates={itineraryDates}
           destination={selectedCity?.name ?? details.destination}
+          initialCityId={selectedCity?.id}
           initialPlannedDate={workspaceMode === "day" ? activeDate : null}
+          newCityId={newestCityId}
           onAdd={addPlace}
-          onClose={() => setAddOpen(false)}
+          onAddCity={() => { setNewCityForPlace(true); setCityOpen(true); }}
+          onCityChange={() => setNewestCityId(null)}
+          onClose={() => { setAddOpen(false); setNewestCityId(null); }}
         />
       ) : null}
-      {cityOpen ? <AddCityDialog details={details} onAdd={addCity} onClose={() => setCityOpen(false)} /> : null}
+      {cityOpen ? <AddCityDialog details={details} onAdd={(city) => { const added = addCity(city); if (newCityForPlace) setNewestCityId(added.id); setNewCityForPlace(false); }} onClose={() => setCityOpen(false)} /> : null}
       {flightEditor ? (
         <FlightPlanDialog
           flight={flightEditor === "new" ? null : flightEditor}
