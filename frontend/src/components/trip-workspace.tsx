@@ -5,6 +5,8 @@ import {
   Bike,
   Bookmark,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   Coffee,
   FileText,
   ExternalLink,
@@ -29,6 +31,7 @@ import {
   addDayNote as persistAddDayNote,
   addPlace as persistPlace,
   addTripCity as persistAddTripCity,
+  reorderDayPlaces as persistReorderDayPlaces,
   removeDayNote as persistRemoveDayNote,
   removePlace as persistRemovePlace,
   removeTripCity as persistRemoveTripCity,
@@ -285,6 +288,25 @@ export function TripWorkspace({
         });
       } catch (error) {
         setPlaces((current) => current.map((item) => (item.id === id ? previous : item)));
+        throw error;
+      }
+    });
+  }
+
+  function reorderDay(plannedDate: string, placeIds: string[]) {
+    const previous = places;
+    const order = new Map(placeIds.map((id, index) => [id, index]));
+    setPlaces((current) => current.map((place) => (
+      place.plannedDate === plannedDate && order.has(place.id)
+        ? { ...place, daySortOrder: order.get(place.id) ?? place.daySortOrder }
+        : place
+    )));
+    if (!persistable) return;
+    enqueuePersist(async () => {
+      try {
+        await persistReorderDayPlaces({ tripId: trip.id, plannedDate, placeIds });
+      } catch (error) {
+        setPlaces(previous);
         throw error;
       }
     });
@@ -565,6 +587,7 @@ export function TripWorkspace({
               onFocusDate={setActiveDate}
               onRemoveNote={removeNote}
               onSelectPlace={selectPlace}
+              onReorderDay={reorderDay}
               onToggleSaved={toggleSaved}
               onUpdateNote={updateNote}
               onUpdatePlanning={updatePlanning}
@@ -691,6 +714,7 @@ function DayPlan({
   filter,
   onAddNote,
   onFocusDate,
+  onReorderDay,
   onRemoveNote,
   onSelectPlace,
   onToggleSaved,
@@ -709,6 +733,7 @@ function DayPlan({
   onFocusDate: (plannedDate: string | null) => void;
   onRemoveNote: (noteId: string) => void;
   onSelectPlace: (placeId: string) => void;
+  onReorderDay: (plannedDate: string, placeIds: string[]) => void;
   onToggleSaved: (placeId: string) => void;
   onUpdateNote: (noteId: string, note: string) => void;
   onUpdatePlanning: (placeId: string, plannedDate: string, cityId: string) => void;
@@ -735,6 +760,9 @@ function DayPlan({
       .filter((place) => place.plannedDate === currentDate && cityMatches(place.cityId) && categoryMatches(place.category))
       .sort((left, right) => (left.daySortOrder ?? 0) - (right.daySortOrder ?? 0))
     : unplannedPlaces;
+  const canReorder = Boolean(currentDate && activeCityId === "all" && filter === "All" && dayPlaces.length > 1);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   function movePage(delta: number) {
     const nextIndex = Math.min(Math.max(clampedPageIndex + delta, 0), Math.max(0, totalPages - 1));
@@ -744,6 +772,23 @@ function DayPlan({
 
   function showCurrentDateOnMap() {
     if (currentDate) onFocusDate(activeDate === currentDate ? null : currentDate);
+  }
+
+  function reorderPlace(placeId: string, targetIndex: number) {
+    if (!currentDate) return;
+    const fromIndex = dayPlaces.findIndex((place) => place.id === placeId);
+    if (fromIndex < 0 || fromIndex === targetIndex) return;
+    const next = [...dayPlaces];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    onReorderDay(currentDate, next.map((place) => place.id));
+  }
+
+  function movePlace(placeId: string, direction: -1 | 1) {
+    const fromIndex = dayPlaces.findIndex((place) => place.id === placeId);
+    const targetIndex = fromIndex + direction;
+    if (targetIndex < 0 || targetIndex >= dayPlaces.length) return;
+    reorderPlace(placeId, targetIndex);
   }
 
   return (
@@ -776,14 +821,25 @@ function DayPlan({
             <NoteComposer activeCityId={activeCityId} cities={cities} onAdd={(note, cityId) => onAddNote(currentDate, note, cityId)} />
           </div>
           <div className="day-place-list">
+            {canReorder ? <p className="day-reorder-hint">Drag a place or use the arrows to set the order for this day.</p> : null}
             {dayPlaces.map((place, placeIndex) => {
               const number = String(placeIndex + 1).padStart(2, "0");
               return (
                 <DayPlaceRow
+                  canMoveDown={placeIndex < dayPlaces.length - 1}
                   cities={cities}
                   dates={dates}
                   key={place.id}
+                  canReorder={canReorder}
+                  dragging={draggingId === place.id}
+                  dropTarget={dropTargetId === place.id}
                   number={number}
+                  onDragEnd={() => { setDraggingId(null); setDropTargetId(null); }}
+                  onDragOver={() => { if (canReorder) setDropTargetId(place.id); }}
+                  onDragStart={() => setDraggingId(place.id)}
+                  onDrop={() => { if (draggingId) reorderPlace(draggingId, placeIndex); setDraggingId(null); setDropTargetId(null); }}
+                  onMoveDown={() => movePlace(place.id, 1)}
+                  onMoveUp={() => movePlace(place.id, -1)}
                   onSelect={onSelectPlace}
                   onToggleSaved={onToggleSaved}
                   onUpdatePlanning={onUpdatePlanning}
@@ -807,10 +863,20 @@ function DayPlan({
               const number = String(placeIndex + 1).padStart(2, "0");
               return (
                 <DayPlaceRow
+                  canMoveDown={false}
+                  canReorder={false}
                   cities={cities}
                   dates={dates}
+                  dragging={false}
+                  dropTarget={false}
                   key={place.id}
                   number={number}
+                  onDragEnd={() => undefined}
+                  onDragOver={() => undefined}
+                  onDragStart={() => undefined}
+                  onDrop={() => undefined}
+                  onMoveDown={() => undefined}
+                  onMoveUp={() => undefined}
                   onSelect={onSelectPlace}
                   onToggleSaved={onToggleSaved}
                   onUpdatePlanning={onUpdatePlanning}
@@ -827,18 +893,38 @@ function DayPlan({
 }
 
 function DayPlaceRow({
+  canMoveDown,
+  canReorder,
   cities,
   dates,
+  dragging,
+  dropTarget,
   number,
+  onDragEnd,
+  onDragOver,
+  onDragStart,
+  onDrop,
+  onMoveDown,
+  onMoveUp,
   onSelect,
   onToggleSaved,
   onUpdatePlanning,
   place,
   selected,
 }: {
+  canMoveDown: boolean;
+  canReorder: boolean;
   cities: CityStop[];
   dates: string[];
+  dragging: boolean;
+  dropTarget: boolean;
   number: string;
+  onDragEnd: () => void;
+  onDragOver: () => void;
+  onDragStart: () => void;
+  onDrop: () => void;
+  onMoveDown: () => void;
+  onMoveUp: () => void;
   onSelect: (placeId: string) => void;
   onToggleSaved: (placeId: string) => void;
   onUpdatePlanning: (placeId: string, plannedDate: string, cityId: string) => void;
@@ -849,8 +935,13 @@ function DayPlaceRow({
 
   return (
     <article
-      className={`day-place${selected ? " selected" : ""}`}
+      className={`day-place${selected ? " selected" : ""}${canReorder ? " reorderable" : ""}${dragging ? " dragging" : ""}${dropTarget ? " drop-target" : ""}`}
+      draggable={canReorder}
       id={`day-place-${place.id}`}
+      onDragEnd={onDragEnd}
+      onDragOver={(event) => { if (!canReorder) return; event.preventDefault(); onDragOver(); }}
+      onDragStart={onDragStart}
+      onDrop={(event) => { if (!canReorder) return; event.preventDefault(); onDrop(); }}
       onClick={() => onSelect(place.id)}
       onKeyDown={(event) => {
         if (event.currentTarget !== event.target) return;
@@ -887,6 +978,10 @@ function DayPlaceRow({
         </div>
       </div>
       <div className="place-row-controls">
+        {canReorder ? <div className="day-reorder-controls" aria-label={`Reorder ${place.name}`}>
+          <button aria-label={`Move ${place.name} earlier`} disabled={number === "01"} onClick={(event) => { event.stopPropagation(); onMoveUp(); }} type="button"><ChevronUp size={14} /></button>
+          <button aria-label={`Move ${place.name} later`} disabled={!canMoveDown} onClick={(event) => { event.stopPropagation(); onMoveDown(); }} type="button"><ChevronDown size={14} /></button>
+        </div> : null}
         <button className="save-button" onClick={(event) => { event.stopPropagation(); onToggleSaved(place.id); }} aria-label={place.saved ? `Unsave ${place.name}` : `Save ${place.name}`} type="button"><Bookmark size={18} fill={place.saved ? "currentColor" : "none"} /></button>
       </div>
     </article>
