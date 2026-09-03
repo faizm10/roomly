@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { countryFromDestination, formatDateLabel } from "@/lib/dates";
 import { getDatabase } from "@/lib/db";
-import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
-import type { CityStop, Collaborator, DayNote, PlaceCategory, Trip, TripAgenda, TripViewer } from "@/lib/types";
+import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripFlights, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
+import type { CityStop, Collaborator, DayNote, Flight, PlaceCategory, Trip, TripAgenda, TripViewer } from "@/lib/types";
 
 function asIsoDate(value: string | Date) {
   if (typeof value === "string") return value.slice(0, 10);
@@ -44,6 +44,11 @@ function isPlanningSchemaMissing(error: unknown) {
 function isAgendaSchemaMissing(error: unknown) {
   const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
   return /trip_agendas|trip_agenda_day_notes|trip_agenda_items|agenda/i.test(message);
+}
+
+function isFlightSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /trip_flights|departure_airport|arrival_airport|departure_time|arrival_time|relation .* does not exist|column .* does not exist/i.test(message);
 }
 
 function isUniqueConstraintError(error: unknown) {
@@ -96,6 +101,7 @@ function toTrip(row: {
   placeCount?: number;
   cities?: CityStop[];
   dayNotes?: DayNote[];
+  flights?: Flight[];
   agenda?: TripAgenda;
   collaborators?: Collaborator[];
 }): Trip {
@@ -113,6 +119,7 @@ function toTrip(row: {
     endDate,
     cities,
     dayNotes: row.dayNotes ?? [],
+    flights: row.flights ?? [],
     agenda: row.agenda ?? { brief: "", dayNotes: [], items: [] },
     places: Array.from({ length: placeCount }, (_, index) => ({
       id: `${row.id}-place-${index}`,
@@ -416,6 +423,28 @@ export async function getViewerTrip(tripId: string, viewer: TripViewer): Promise
       sortOrder: note.sortOrder,
       addedBy: namesByUser.get(note.addedBy) || note.addedBy,
     }));
+  }
+  try {
+    const flights = await db
+      .select({
+        id: tripFlights.id,
+        plannedDate: tripFlights.plannedDate,
+        airline: tripFlights.airline,
+        flightNumber: tripFlights.flightNumber,
+        departureAirport: tripFlights.departureAirport,
+        arrivalAirport: tripFlights.arrivalAirport,
+        departureTime: tripFlights.departureTime,
+        arrivalTime: tripFlights.arrivalTime,
+      })
+      .from(tripFlights)
+      .where(eq(tripFlights.tripId, tripId))
+      .orderBy(tripFlights.plannedDate, tripFlights.departureTime);
+    trip.flights = flights.map((flight) => ({
+      ...flight,
+      plannedDate: asIsoDate(flight.plannedDate),
+    }));
+  } catch (error) {
+    if (!isFlightSchemaMissing(error)) throw error;
   }
   try {
     const [agendaRows, agendaDayNotes, agendaItems] = await Promise.all([
