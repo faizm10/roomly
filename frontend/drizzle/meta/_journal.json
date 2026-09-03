@@ -57,6 +57,13 @@
       "when": 1788395343495,
       "tag": "0007_lumpy_the_hood",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788397702668,
+      "tag": "0008_little_silver_centurion",
+      "breakpoints": true
     }
   ]
 }
