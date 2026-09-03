@@ -87,10 +87,10 @@ function tripDates(startDate: string, endDate: string) {
   return dates;
 }
 
-function formatDayHeading(iso: string, index: number) {
+function formatDayHeading(iso: string) {
   const date = new Date(`${iso}T00:00:00.000Z`);
   return {
-    day: `Day ${index + 1}`,
+    day: date.toLocaleDateString("en", { weekday: "long", timeZone: "UTC" }),
     date: date.toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" }),
   };
 }
@@ -652,8 +652,8 @@ function PlanningControls({
         <span>Day</span>
         <select value={dateValue} onChange={(event) => onChange(place.id, event.target.value, cityValue)} aria-label={`Plan day for ${place.name}`}>
           <option value="">Unscheduled</option>
-          {dates.map((date, index) => {
-            const label = formatDayHeading(date, index);
+          {dates.map((date) => {
+            const label = formatDayHeading(date);
             return <option value={date} key={date}>{label.day} · {label.date}</option>;
           })}
         </select>
@@ -711,7 +711,7 @@ function DayPlan({
   const [pageIndex, setPageIndex] = useState(() => Math.max(0, activeDate ? dates.indexOf(activeDate) : 0));
   const clampedPageIndex = Math.min(pageIndex, Math.max(0, totalPages - 1));
   const currentDate = clampedPageIndex < dates.length ? dates[clampedPageIndex] : null;
-  const label = currentDate ? formatDayHeading(currentDate, clampedPageIndex) : null;
+  const label = currentDate ? formatDayHeading(currentDate) : null;
   const notes = currentDate
     ? dayNotes
       .filter((note) => note.plannedDate === currentDate && cityMatches(note.cityId))
@@ -742,7 +742,7 @@ function DayPlan({
         </div>
         <div className="day-pagination" aria-label="Day pages">
           <button onClick={() => movePage(-1)} disabled={clampedPageIndex === 0} type="button">Prev</button>
-          <span>{currentDate ? `${label?.day} of ${dates.length}` : "Saved for later"}</span>
+          <span>{currentDate && label ? `${label.day} · ${label.date}` : "Saved for later"}</span>
           <button onClick={() => movePage(1)} disabled={clampedPageIndex >= totalPages - 1} type="button">Next</button>
           <button className={!activeDate ? "active" : ""} onClick={() => onFocusDate(null)} type="button">Map all days</button>
         </div>
