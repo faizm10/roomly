@@ -853,6 +853,13 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .day-section > header h2 { margin: 5px 0 0; font-size: 28px; font-weight: 650; letter-spacing: -.04em; }
 .day-section-actions { display: flex; align-items: center; gap: 7px; }
 .day-section header .flight-plan-add { display: inline-flex; align-items: center; gap: 5px; border-color: var(--ink); color: var(--ink); }
+.day-section header .hotel-stay-add { display: inline-flex; align-items: center; gap: 5px; border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.hotel-strip { display: grid; width: 100%; min-height: 62px; margin-top: 18px; padding: 10px 12px; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); text-align: left; cursor: pointer; }
+.hotel-strip:hover { background: var(--surface); }
+.hotel-strip-icon { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--ink); border-radius: 50%; }
+.hotel-strip small, .hotel-strip em { display: block; color: var(--muted); font-size: 9px; font-style: normal; letter-spacing: .055em; text-transform: uppercase; }
+.hotel-strip strong { display: block; margin: 3px 0; font-size: 14px; letter-spacing: -.02em; }
+.hotel-strip-route { color: var(--muted); font-size: 10px; font-weight: 650; }
 .flight-list { display: grid; margin: 20px 0 2px; gap: 7px; }
 .flight-strip { display: grid; width: 100%; min-height: 58px; padding: 9px 12px; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
 .flight-strip:hover { border-color: var(--ink); background: var(--paper); }
@@ -906,6 +913,8 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .mapbox-marker-with-preview { z-index: 6; width: 34px; height: 34px; }
 .mapbox-marker-with-preview.preview-open { z-index: 16; }
 .mapbox-place-pin { display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 2px solid var(--paper); border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--paper); font-size: 8px; font-weight: 700; cursor: pointer; transition: transform 140ms ease; }
+.mapbox-hotel-marker { z-index: 8; }
+.mapbox-hotel-pin { display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 2px solid var(--paper); border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--ink); color: var(--paper); font-size: 10px; font-weight: 750; cursor: pointer; }
 .mapbox-place-pin:hover, .mapbox-place-pin:focus-visible { transform: scale(1.08); }
 .mapbox-place-pin.selected { background: var(--paper); box-shadow: 0 0 0 2px var(--accent); color: var(--accent); transform: scale(1.14); }
 .place-map-popup { z-index: 18; }
@@ -955,6 +964,7 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .workspace-pin { position: absolute; z-index: 5; }
 .workspace-pin:hover, .workspace-pin:focus-within { z-index: 18; }
 .workspace-pin-button { display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 2px solid var(--paper); border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1px var(--ink); color: var(--paper); font-size: 8px; font-weight: 700; cursor: pointer; }
+.workspace-hotel-pin .workspace-pin-button { box-shadow: 0 0 0 3px var(--ink); font-size: 10px; }
 .workspace-pin.selected .workspace-pin-button { background: var(--paper); box-shadow: 0 0 0 2px var(--ink); color: var(--ink); }
 .workspace-pin .map-preview-card { position: absolute; top: 43px; left: 50%; z-index: 2; opacity: 0; transform: translate(-50%, -4px); transition: opacity 120ms ease, transform 120ms ease; visibility: hidden; }
 .workspace-pin:hover .map-preview-card, .workspace-pin:focus-within .map-preview-card { opacity: 1; transform: translate(-50%, 0); visibility: visible; }
@@ -1015,6 +1025,12 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .flight-route-fields input { font-family: var(--font-mono), monospace; letter-spacing: .08em; text-transform: uppercase; }
 .flight-dialog-actions { display: flex; margin-top: 8px; align-items: center; justify-content: space-between; gap: 12px; }
 .flight-dialog-actions .button { min-height: 38px; }
+.hotel-dialog .search-hint { line-height: 1.5; }
+.inline-action { padding: 0; border: 0; border-bottom: 1px solid var(--ink); background: transparent; color: var(--ink); font: inherit; font-weight: 650; cursor: pointer; }
+.hotel-date-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 11px; }
+.hotel-date-grid .field-label { margin-bottom: 12px; }
+.hotel-date-hint { margin: 4px 0 18px; color: var(--muted); font-size: 11px; }
+.hotel-locate { margin: -4px 0 18px; }
 .url-input, .day-select-input { display: flex; padding-left: 13px; align-items: center; gap: 8px; border: 1px solid var(--line); }
 .url-input input, .day-select-input select { padding-left: 0; border: 0; }
 .day-select-input svg, .url-input svg { flex: none; color: var(--muted); }
@@ -1162,6 +1178,8 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
   .day-section header .flight-plan-add { padding-inline: 8px; }
   .flight-strip { grid-template-columns: 31px minmax(0, 1fr); padding: 9px; }
   .flight-strip-times { grid-column: 2; justify-items: start; text-align: left; }
+  .hotel-strip { grid-template-columns: 31px minmax(0, 1fr); padding: 9px; }
+  .hotel-strip-route { display: none; }
   .day-notes { padding-left: 38px; }
   .workspace-mode { width: 100%; }
   .workspace-mode button { padding-inline: 7px; font-size: 10px; }
@@ -1184,6 +1202,7 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
   .place-dialog, .nav-dialog, .invite-dialog { width: 100%; max-width: none; max-height: 94svh; padding: 20px 18px 34px; border-right: 0; border-bottom: 0; border-left: 0; }
   .place-dialog h2, .nav-dialog h2, .invite-dialog h2 { font-size: 39px; }
   .flight-form-grid { gap: 10px; }
+  .hotel-date-grid { grid-template-columns: 1fr; gap: 0; }
   .generated-invite { grid-template-columns: 1fr; }
   .generated-invite strong { max-width: calc(100vw - 72px); }
   .pending-invite { grid-template-columns: 1fr; }
