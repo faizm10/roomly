@@ -1041,6 +1041,9 @@ input::placeholder, textarea::placeholder { color: #9b9b97; }
 .hotel-date-hint { margin: 4px 0 18px; color: var(--muted); font-size: 11px; }
 .hotel-locate { margin: -4px 0 18px; }
 .url-input, .day-select-input { display: flex; padding-left: 13px; align-items: center; gap: 8px; border: 1px solid var(--line); }
+.place-city-select { display: grid; grid-template-columns: 1fr auto; border: 1px solid var(--line); }
+.place-city-select select { min-height: 40px; padding: 0 11px; border: 0; background: var(--paper); font-size: 12px; }
+.place-city-select button { padding: 0 10px; border: 0; border-left: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 10px; font-weight: 650; cursor: pointer; }
 .url-input input, .day-select-input select { padding-left: 0; border: 0; }
 .day-select-input svg, .url-input svg { flex: none; color: var(--muted); }
 .nav-dialog { position: relative; max-width: 430px; text-align: center; }
