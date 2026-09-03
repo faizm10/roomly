@@ -109,6 +109,38 @@ export const removeDayNoteSchema = z.object({
   noteId: z.string().uuid(),
 });
 
+const optionalAgendaDate = z.iso.date().optional().or(z.literal(""));
+const optionalAgendaTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().or(z.literal(""));
+
+export const updateAgendaBriefSchema = z.object({
+  tripId: z.string().uuid(),
+  brief: z.string().trim().max(5000),
+});
+
+export const saveAgendaDayNoteSchema = z.object({
+  tripId: z.string().uuid(),
+  plannedDate: z.iso.date(),
+  note: z.string().trim().max(2000),
+});
+
+export const addAgendaItemSchema = z.object({
+  tripId: z.string().uuid(),
+  plannedDate: optionalAgendaDate,
+  startTime: optionalAgendaTime,
+  placeId: z.string().uuid().optional().or(z.literal("")),
+  title: z.string().trim().min(1).max(160),
+});
+
+export const updateAgendaItemSchema = addAgendaItemSchema.extend({
+  itemId: z.string().uuid(),
+  completed: z.boolean(),
+});
+
+export const removeAgendaItemSchema = z.object({
+  tripId: z.string().uuid(),
+  itemId: z.string().uuid(),
+});
+
 export const directionsSchema = z.object({
   coordinates: z
     .array(z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]))
