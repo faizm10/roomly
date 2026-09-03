@@ -205,6 +205,7 @@ export function TripWorkspace({
     return cityScopedPlaces;
   }, [activeDate, cityScopedPlaces, workspaceMode]);
   const routeStops = useMemo<RouteStop[]>(() => activeHotel ? [{ id: `hotel-${activeHotel.id}`, name: activeHotel.name, coordinates: activeHotel.coordinates }, ...mapPlaces.map((place) => ({ id: place.id, name: place.name, coordinates: place.coordinates }))] : mapPlaces.map((place) => ({ id: place.id, name: place.name, coordinates: place.coordinates })), [activeHotel, mapPlaces]);
+  const routeCoordinates = useMemo(() => routeStops.map((stop) => stop.coordinates), [routeStops]);
   const routeAvailable = routeStops.length >= 2;
 
   const selectPlace = useCallback((id: string) => {
@@ -726,7 +727,7 @@ export function TripWorkspace({
       </aside>
 
       <section className="map-panel">
-        <TripMap destination={selectedCity?.name ?? details.destination} hotels={mapHotels} places={mapPlaces} routeCoordinates={routeStops.map((stop) => stop.coordinates)} selectedId={selectedId} onSelect={selectPlace} routeActive={Boolean(routeMode) && routeStops.length >= 2} mapToken={mapToken} />
+        <TripMap destination={selectedCity?.name ?? details.destination} hotels={mapHotels} places={mapPlaces} routeCoordinates={routeCoordinates} selectedId={selectedId} onSelect={selectPlace} routeActive={Boolean(routeMode) && routeStops.length >= 2} mapToken={mapToken} />
         <div className="map-topbar">
           <button className={`route-button${routeMode ? " active" : ""}`} disabled={!routeAvailable} onClick={() => setRouteMode((current) => current ?? "walking")} type="button"><Route size={16} /> {routeMode ? "Route active" : "Plan a route"}</button>
         </div>
