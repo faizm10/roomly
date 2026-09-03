@@ -84,6 +84,14 @@ export const updatePlacePlanningSchema = z.object({
   daySortOrder: z.number().int().min(0).optional(),
 });
 
+export const reorderDayPlacesSchema = z.object({
+  tripId: z.string().uuid(),
+  plannedDate: z.iso.date(),
+  placeIds: z.array(z.string().uuid()).min(1).max(100).refine((ids) => new Set(ids).size === ids.length, {
+    message: "Each place can only appear once in the itinerary order.",
+  }),
+});
+
 export const removePlaceSchema = z.object({
   tripId: z.string().uuid(),
   placeId: z.string().uuid(),
