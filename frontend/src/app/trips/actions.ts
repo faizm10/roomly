@@ -6,11 +6,12 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { getDatabase } from "@/lib/db";
 import { countryFromDestination } from "@/lib/dates";
-import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripInvitationAcceptances, tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
+import { tripAgendaDayNotes, tripAgendaItems, tripAgendas, tripCities, tripDayNotes, tripFlights, tripInvitationAcceptances, tripInvitations, tripMembers, tripPlaces, trips } from "@/lib/db/schema";
 import { createInviteToken, hashInviteToken, inviteExpiresAt, inviteStatus } from "@/lib/invitations";
 import type { TripInvitationSummary } from "@/lib/types";
 import {
   addDayNoteSchema,
+  addFlightSchema,
   addAgendaItemSchema,
   addPlaceSchema,
   addTripCitySchema,
@@ -20,6 +21,7 @@ import {
   inviteSchema,
   inviteTokenSchema,
   removeDayNoteSchema,
+  removeFlightSchema,
   removeAgendaItemSchema,
   removePlaceSchema,
   reorderDayPlacesSchema,
@@ -27,6 +29,7 @@ import {
   revokeInviteSchema,
   saveAgendaDayNoteSchema,
   updateDayNoteSchema,
+  updateFlightSchema,
   updateAgendaBriefSchema,
   updateAgendaItemSchema,
   updatePlacePlanningSchema,
@@ -88,6 +91,15 @@ function isAgendaSchemaMissing(error: unknown) {
 
 function agendaMigrationError() {
   return new Error("Agenda needs the latest database migration before it can be saved.");
+}
+
+function isFlightSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? `${error.message} ${error.cause ?? ""}` : String(error);
+  return /trip_flights|departure_airport|arrival_airport|departure_time|arrival_time|relation .* does not exist|column .* does not exist/i.test(message);
+}
+
+function flightMigrationError() {
+  return new Error("Flight plans need the latest database migration before they can be saved.");
 }
 
 async function ensureAgendaPlace(tripId: string, placeId?: string | null) {
@@ -475,6 +487,71 @@ export async function removeDayNote(input: unknown) {
   await db.delete(tripDayNotes).where(and(eq(tripDayNotes.id, data.noteId), eq(tripDayNotes.tripId, data.tripId)));
   revalidateTrip(data.tripId);
   return { demo: false };
+}
+
+export async function addFlight(input: unknown) {
+  const viewer = await requireViewer();
+  const data = addFlightSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true, id: "" };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    const [flight] = await db
+      .insert(tripFlights)
+      .values(data)
+      .returning({ id: tripFlights.id });
+    revalidateTrip(data.tripId);
+    return { demo: false, id: flight.id };
+  } catch (error) {
+    if (isFlightSchemaMissing(error)) throw flightMigrationError();
+    throw error;
+  }
+}
+
+export async function updateFlight(input: unknown) {
+  const viewer = await requireViewer();
+  const data = updateFlightSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    const [flight] = await db
+      .update(tripFlights)
+      .set({
+        plannedDate: data.plannedDate,
+        airline: data.airline,
+        flightNumber: data.flightNumber,
+        departureAirport: data.departureAirport,
+        arrivalAirport: data.arrivalAirport,
+        departureTime: data.departureTime,
+        arrivalTime: data.arrivalTime,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(tripFlights.id, data.flightId), eq(tripFlights.tripId, data.tripId)))
+      .returning({ id: tripFlights.id });
+    if (!flight) throw new Error("This flight could not be updated.");
+    revalidateTrip(data.tripId);
+    return { demo: false };
+  } catch (error) {
+    if (isFlightSchemaMissing(error)) throw flightMigrationError();
+    throw error;
+  }
+}
+
+export async function removeFlight(input: unknown) {
+  const viewer = await requireViewer();
+  const data = removeFlightSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  try {
+    await db.delete(tripFlights).where(and(eq(tripFlights.id, data.flightId), eq(tripFlights.tripId, data.tripId)));
+    revalidateTrip(data.tripId);
+    return { demo: false };
+  } catch (error) {
+    if (isFlightSchemaMissing(error)) throw flightMigrationError();
+    throw error;
+  }
 }
 
 export async function updateAgendaBrief(input: unknown) {
