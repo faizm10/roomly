@@ -64,6 +64,7 @@ export type DayNote = {
 export type Flight = {
   id: string;
   plannedDate: string;
+  arrivalDate: string;
   airline: string;
   flightNumber: string;
   departureAirport: string;
