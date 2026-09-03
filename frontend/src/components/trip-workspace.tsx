@@ -173,7 +173,7 @@ export function TripWorkspace({
   );
   const selected = places.find((place) => place.id === selectedId);
   const mapPlaces = useMemo(() => {
-    if ((workspaceMode === "day" || workspaceMode === "agenda") && activeDate) {
+    if (workspaceMode === "day" && activeDate) {
       return cityScopedPlaces.filter((place) => place.plannedDate === activeDate);
     }
     return cityScopedPlaces;
@@ -597,12 +597,8 @@ export function TripWorkspace({
           ) : (
             <AgendaPanel
               agenda={trip.agenda}
-              dates={itineraryDates}
-              onEditTrip={() => setLogisticsOpen(true)}
-              onFocusDate={(date) => setActiveDate(date)}
               onSaveState={setSaveState}
               persistable={persistable}
-              places={places}
               tripId={trip.id}
             />
           )}
@@ -637,7 +633,7 @@ export function TripWorkspace({
         <AddPlaceDialog
           dates={itineraryDates}
           destination={selectedCity?.name ?? details.destination}
-          initialPlannedDate={workspaceMode === "day" || workspaceMode === "agenda" ? activeDate : null}
+          initialPlannedDate={workspaceMode === "day" ? activeDate : null}
           onAdd={addPlace}
           onClose={() => setAddOpen(false)}
         />
