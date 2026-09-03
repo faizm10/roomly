@@ -61,6 +61,17 @@ export type DayNote = {
   addedBy: string;
 };
 
+export type Flight = {
+  id: string;
+  plannedDate: string;
+  airline: string;
+  flightNumber: string;
+  departureAirport: string;
+  arrivalAirport: string;
+  departureTime: string;
+  arrivalTime: string;
+};
+
 export type AgendaItem = {
   id: string;
   plannedDate?: string | null;
@@ -111,6 +122,7 @@ export type Trip = {
   endDate: string;
   cities: CityStop[];
   dayNotes: DayNote[];
+  flights: Flight[];
   agenda: TripAgenda;
   places: Place[];
   collaborators: Collaborator[];
