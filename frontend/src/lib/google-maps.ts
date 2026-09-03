@@ -59,6 +59,23 @@ export function cityFromGooglePrediction(
 
 export function categoryFromGoogleTypes(types: string[] = [], primaryType?: string): PlaceCategory {
   const labels = [primaryType, ...types].filter(Boolean).map((value) => value!.toLowerCase());
+  if (
+    labels.some(
+      (label) =>
+        label.includes("airport") ||
+        label.includes("bus_station") ||
+        label.includes("bus_stop") ||
+        label.includes("ferry_terminal") ||
+        label.includes("light_rail_station") ||
+        label.includes("park_and_ride") ||
+        label.includes("subway_station") ||
+        label.includes("train_station") ||
+        label.includes("transit") ||
+        label.includes("transport"),
+    )
+  ) {
+    return "Transit";
+  }
   if (labels.some((label) => label.includes("cafe") || label.includes("coffee") || label.includes("bar") || label.includes("night_club"))) {
     return "Drink";
   }

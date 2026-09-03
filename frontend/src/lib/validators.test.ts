@@ -17,10 +17,11 @@ import {
   saveAgendaDayNoteSchema,
   signInSchema,
   signUpSchema,
-  updatePlacePlanningSchema,
-  updateTripSchema,
   updateAgendaBriefSchema,
   updateFlightSchema,
+  updatePlaceDetailsSchema,
+  updatePlacePlanningSchema,
+  updateTripSchema,
 } from "@/lib/validators";
 
 describe("trip validation", () => {
@@ -73,6 +74,37 @@ describe("trip validation", () => {
       category: "See",
       plannedDate: "2026-09-24",
       daySortOrder: 2,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a saved transit stop", () => {
+    const result = addPlaceSchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      fsqPlaceId: "station-1",
+      name: "Cais do Sodre Station",
+      address: "Praca do Duque da Terceira",
+      neighborhood: "Cais do Sodre",
+      longitude: -9.1453,
+      latitude: 38.7061,
+      category: "Transit",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts editing saved place details", () => {
+    const result = updatePlaceDetailsSchema.safeParse({
+      tripId: "210e9464-8cad-406b-96a0-b1463ce0eace",
+      placeId: "83cb9471-a356-4a42-a13f-23c6fb93bb0c",
+      cityId: "83cb9471-a356-4a42-a13f-23c6fb93bb0d",
+      name: "Mishima Skywalk",
+      address: "313 Sasahara Shinden, Mishima",
+      neighborhood: "Sasahara Shinden",
+      category: "Other",
+      note: "Go before lunch for clearer views.",
+      sourceUrl: "https://example.com/skywalk",
+      plannedDate: "2026-09-29",
+      daySortOrder: 14,
     });
     expect(result.success).toBe(true);
   });

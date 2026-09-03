@@ -1,9 +1,19 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Search, X } from "lucide-react";
+import { ArrowLeft, BedDouble, CalendarDays, Coffee, ExternalLink, Landmark, MapPin, Search, ShoppingBag, TramFront, Utensils, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PLACE_CATEGORIES, categoryClass, type CityStop, type Place, type PlaceCategory, type PlaceSearchResult } from "@/lib/types";
+
+const categoryIcons = {
+  Eat: Utensils,
+  Drink: Coffee,
+  See: Landmark,
+  Shop: ShoppingBag,
+  Stay: BedDouble,
+  Transit: TramFront,
+  Other: MapPin,
+} satisfies Record<PlaceCategory, typeof MapPin>;
 
 type AddPlaceDialogProps = {
   destination: string;
@@ -86,17 +96,20 @@ export function AddPlaceDialog({ cities, destination, initialCityId, initialPlan
           <>
             <h2 id="add-place-title">What&apos;s worth a stop?</h2>
             <div className="place-search-box"><Search size={20} /><input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${searchDestination}`} aria-label="Search places" /></div>
-            <p className="search-hint">Search a restaurant, shop, landmark, or address. <button className="inline-action" onClick={onAddCity} type="button">Add a city</button></p>
+            <p className="search-hint">Search a restaurant, shop, landmark, transit stop, or address. <button className="inline-action" onClick={onAddCity} type="button">Add a city</button></p>
             <div className="search-results" aria-live="polite">
               {search.isFetching && <p className="search-state">Looking around…</p>}
               {search.isError && <p className="form-error">{search.error.message}</p>}
-              {search.data?.results.map((place) => (
-                <button className="search-result" onClick={() => choose(place)} key={place.fsqPlaceId} type="button">
-                  <span className="result-pin"><MapPin size={17} /></span>
-                  <span><strong>{place.name}</strong><small>{place.address} · {place.neighborhood}</small></span>
-                  <span className={`category-tag result-category ${categoryClass(place.category)}`}>{place.category}</span>
-                </button>
-              ))}
+              {search.data?.results.map((place) => {
+                const Icon = categoryIcons[place.category];
+                return (
+                  <button className="search-result" onClick={() => choose(place)} key={place.fsqPlaceId} type="button">
+                    <span className={`result-pin ${categoryClass(place.category)}`}><Icon size={17} /></span>
+                    <span><strong>{place.name}</strong><small>{place.address} · {place.neighborhood}</small></span>
+                    <span className={`category-tag result-category ${categoryClass(place.category)}`}>{place.category}</span>
+                  </button>
+                );
+              })}
               {query.length < 2 && <div className="search-empty"><span>PASTE IT.<br />FIND IT.<br />PIN IT.</span></div>}
             </div>
           </>

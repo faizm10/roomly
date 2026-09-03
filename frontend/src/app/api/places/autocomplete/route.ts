@@ -6,6 +6,17 @@ export const dynamic = "force-dynamic";
 
 function normalizeCategory(value?: string): PlaceCategory {
   const label = value?.toLowerCase() ?? "";
+  if (
+    label.includes("airport") ||
+    label.includes("bus") ||
+    label.includes("ferry") ||
+    label.includes("rail") ||
+    label.includes("station") ||
+    label.includes("subway") ||
+    label.includes("train") ||
+    label.includes("transit") ||
+    label.includes("transport")
+  ) return "Transit";
   if (label.includes("coffee") || label.includes("bar")) return "Drink";
   if (label.includes("restaurant") || label.includes("bakery") || label.includes("food")) return "Eat";
   if (label.includes("shop") || label.includes("store") || label.includes("market")) return "Shop";

@@ -76,6 +76,20 @@ export const updatePlaceSchema = z.object({
   saved: z.boolean(),
 });
 
+export const updatePlaceDetailsSchema = z.object({
+  tripId: z.string().uuid(),
+  placeId: z.string().uuid(),
+  cityId: z.string().uuid().optional().or(z.literal("")),
+  name: z.string().trim().min(1).max(200),
+  address: z.string().trim().max(300).default(""),
+  neighborhood: z.string().trim().max(120).default(""),
+  category: z.enum(PLACE_CATEGORIES),
+  note: z.string().trim().max(500).default(""),
+  sourceUrl: z.url().optional().or(z.literal("")),
+  plannedDate: z.iso.date().optional().or(z.literal("")),
+  daySortOrder: z.number().int().min(0).optional(),
+});
+
 export const updatePlacePlanningSchema = z.object({
   tripId: z.string().uuid(),
   placeId: z.string().uuid(),

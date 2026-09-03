@@ -49,6 +49,23 @@ function previewSubtitle(place: Place) {
   return place.neighborhood || place.address || "Saved place";
 }
 
+function isTransitPlace(place: Place) {
+  return place.category === "Transit";
+}
+
+function mapPlaceLabel(place: Place, index: number) {
+  if (isTransitPlace(place)) return "TR";
+  return place.plannedDate ? String(index + 1).padStart(2, "0") : "?";
+}
+
+function mapPlacePinClass(place: Place, selectedId: string) {
+  return `mapbox-place-pin${isTransitPlace(place) ? " transit" : ""}${!place.plannedDate ? " unplanned" : ""}${place.id === selectedId ? " selected" : ""}`;
+}
+
+function workspacePlacePinClass(place: Place, selectedId: string) {
+  return `workspace-pin${isTransitPlace(place) ? " transit" : ""}${!place.plannedDate ? " unplanned" : ""}${selectedId === place.id ? " selected" : ""}`;
+}
+
 function createPreviewCard(place: Place) {
   const card = document.createElement("div");
   card.className = "map-preview-card";
@@ -128,6 +145,7 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
   const initialDestinationRef = useRef(destination);
   const [mapReady, setMapReady] = useState(false);
   const unplannedCount = places.filter((place) => !place.plannedDate).length;
+  const transitCount = places.filter(isTransitPlace).length;
   const routeSignature = routeCoordinates.map(([lng, lat]) => `${lng},${lat}`).join("|");
   const routeData = useMemo(() => ({
     type: "Feature" as const,
@@ -228,10 +246,10 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
       wrapper.className = "mapbox-marker-with-preview";
       const element = document.createElement("button");
       const unplanned = !place.plannedDate;
-      element.className = `mapbox-place-pin${unplanned ? " unplanned" : ""}${place.id === selectedId ? " selected" : ""}`;
+      element.className = mapPlacePinClass(place, selectedId);
       element.type = "button";
       element.ariaLabel = `Select ${place.name}, ${unplanned ? "needs a day" : `planned for ${place.plannedDate}`}, ${place.category}, ${previewSubtitle(place)}`;
-      element.textContent = unplanned ? "?" : String(index + 1).padStart(2, "0");
+      element.textContent = mapPlaceLabel(place, index);
       element.addEventListener("click", () => onSelect(place.id));
       wrapper.append(element);
       const previewCard = createPreviewCard(place);
@@ -298,7 +316,7 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
     return (
       <div className="real-map-wrap">
         <div className="real-map" ref={containerRef} />
-        {unplannedCount ? <MapLegend count={unplannedCount} /> : null}
+        {unplannedCount || transitCount ? <MapLegend transitCount={transitCount} unplannedCount={unplannedCount} /> : null}
         <div className="map-controls"><button type="button" onClick={() => zoom(1)} aria-label="Zoom in"><Plus size={17} /></button><button type="button" onClick={() => zoom(-1)} aria-label="Zoom out"><Minus size={17} /></button></div>
       </div>
     );
@@ -328,10 +346,9 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
         </svg>
       )}
       {places.map((place, index) => {
-        const number = String(index + 1).padStart(2, "0");
         return (
           <div
-            className={`workspace-pin${!place.plannedDate ? " unplanned" : ""}${selectedId === place.id ? " selected" : ""}`}
+            className={workspacePlacePinClass(place, selectedId)}
             style={positions[index % positions.length]}
             key={place.id}
           >
@@ -341,7 +358,7 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
               aria-label={`Select ${place.name}, ${place.plannedDate ? `planned for ${place.plannedDate}` : "needs a day"}, ${place.category}, ${previewSubtitle(place)}`}
               type="button"
             >
-              {!place.plannedDate ? "?" : number}
+              {mapPlaceLabel(place, index)}
             </button>
             <MapPlacePreview place={place} />
           </div>
@@ -349,12 +366,19 @@ export function TripMap({ destination, hotels, places, routeCoordinates, selecte
       })}
       {hotels.map((hotel, index) => <div className="workspace-pin workspace-hotel-pin" style={positions[(index + places.length + 2) % positions.length]} key={`hotel-${hotel.id}`}><button className="workspace-pin-button" aria-label={`Hotel: ${hotel.name}`} type="button">H</button><MapHotelPreview hotel={hotel} /></div>)}
       <div className="map-demo-label">Map preview · {destination || "Add a Mapbox key for live tiles"}</div>
-      {unplannedCount ? <MapLegend count={unplannedCount} /> : null}
+      {unplannedCount || transitCount ? <MapLegend transitCount={transitCount} unplannedCount={unplannedCount} /> : null}
       <div className="map-controls"><button type="button" aria-label="Zoom in"><Plus size={17} /></button><button type="button" aria-label="Zoom out"><Minus size={17} /></button><button type="button" aria-label="Find me"><LocateFixed size={17} /></button></div>
     </div>
   );
 }
 
-function MapLegend({ count }: { count: number }) {
-  return <aside className="map-legend" aria-label="Map legend"><span className="map-legend-key planned">01</span><span>Assigned to a day</span><span className="map-legend-key unplanned">?</span><span>{count} needs a day</span></aside>;
+function MapLegend({ transitCount, unplannedCount }: { transitCount: number; unplannedCount: number }) {
+  return (
+    <aside className="map-legend" aria-label="Map legend">
+      <span className="map-legend-key planned">01</span>
+      <span>Assigned to a day</span>
+      {transitCount ? <><span className="map-legend-key transit">TR</span><span>{transitCount} transit {transitCount === 1 ? "stop" : "stops"}</span></> : null}
+      {unplannedCount ? <><span className="map-legend-key unplanned">?</span><span>{unplannedCount} needs a day</span></> : null}
+    </aside>
+  );
 }

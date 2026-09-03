@@ -18,12 +18,14 @@ import {
   MapPin,
   MoreHorizontal,
   Navigation,
+  Pencil,
   Plus,
   Plane,
   Route,
   Share2,
   ShoppingBag,
   Trash2,
+  TramFront,
   Utensils,
   X,
 } from "lucide-react";
@@ -45,11 +47,13 @@ import {
   updateFlight as persistUpdateFlight,
   updateHotelStay as persistUpdateHotelStay,
   updatePlace as persistUpdatePlace,
+  updatePlaceDetails as persistUpdatePlaceDetails,
   updatePlacePlanning as persistUpdatePlacePlanning,
 } from "@/app/trips/actions";
 import { AddPlaceDialog } from "@/components/add-place-dialog";
 import { AgendaPanel } from "@/components/agenda-panel";
 import { CityField } from "@/components/city-field";
+import { EditPlaceDialog, type PlaceEditDraft } from "@/components/edit-place-dialog";
 import { FlightPlanDialog, type FlightDraft } from "@/components/flight-plan-dialog";
 import { HotelStayDialog, type HotelStayDraft } from "@/components/hotel-stay-dialog";
 import { InviteDialog } from "@/components/invite-dialog";
@@ -79,6 +83,7 @@ const categoryIcons = {
   See: Landmark,
   Shop: ShoppingBag,
   Stay: BedDouble,
+  Transit: TramFront,
   Other: MapPin,
 } satisfies Record<PlaceCategory, typeof MapPin>;
 
@@ -154,6 +159,7 @@ export function TripWorkspace({
   const [newestCityId, setNewestCityId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [logisticsOpen, setLogisticsOpen] = useState(false);
+  const [placeEditor, setPlaceEditor] = useState<Place | null>(null);
   const [flightEditor, setFlightEditor] = useState<Flight | "new" | null>(null);
   const [hotelEditor, setHotelEditor] = useState<HotelStay | "new" | null>(null);
   const [routeMode, setRouteMode] = useState<TravelMode | null>(null);
@@ -288,6 +294,51 @@ export function TripWorkspace({
         setSelectedId((current) => (current === next.id ? saved.id : current));
       } catch (error) {
         setPlaces((current) => current.filter((item) => item.id !== next.id));
+        throw error;
+      }
+    });
+  }
+
+  function savePlaceEdit(id: string, draft: PlaceEditDraft) {
+    const previous = places.find((item) => item.id === id);
+    if (!previous) return;
+    const plannedDate = draft.plannedDate ?? null;
+    const cityId = draft.cityId ?? null;
+    const daySortOrder = plannedDate
+      ? plannedDate === previous.plannedDate
+        ? previous.daySortOrder ?? 0
+        : places.filter((place) => place.plannedDate === plannedDate && place.id !== id && (!cityId || place.cityId === cityId)).length
+      : 0;
+    const next: Place = {
+      ...previous,
+      ...draft,
+      sourceUrl: draft.sourceUrl || undefined,
+      cityId,
+      plannedDate,
+      daySortOrder,
+    };
+    setPlaces((current) => current.map((item) => (item.id === id ? next : item)));
+    setSelectedId(id);
+    if (!persistable) return;
+    enqueuePersist(async () => {
+      try {
+        const placeId = persistedIds.current.get(id) ?? id;
+        if (placeId.startsWith("local-")) return;
+        await persistUpdatePlaceDetails({
+          tripId: trip.id,
+          placeId,
+          cityId: isUuid(cityId) ? cityId : persistedCityIds.current.get(cityId ?? "") ?? "",
+          name: next.name,
+          address: next.address,
+          neighborhood: next.neighborhood,
+          category: next.category,
+          note: next.note,
+          sourceUrl: next.sourceUrl ?? "",
+          plannedDate: next.plannedDate ?? "",
+          daySortOrder,
+        });
+      } catch (error) {
+        setPlaces((current) => current.map((item) => (item.id === id ? previous : item)));
         throw error;
       }
     });
@@ -587,6 +638,9 @@ export function TripWorkspace({
   const activeRouteStats = routeMode && routeStops.length >= 2 ? routeStats : null;
   const minutes = activeRouteStats ? Math.max(1, Math.round(activeRouteStats.durationSeconds / 60)) : null;
   const kilometers = activeRouteStats ? (activeRouteStats.distanceMeters / 1000).toFixed(1) : null;
+  const selectedMapLabel = selected?.category === "Transit"
+    ? "TR"
+    : String(places.findIndex((place) => place.id === selected?.id) + 1).padStart(2, "0");
 
   return (
     <div className={`trip-workspace mobile-${mobileView}`}>
@@ -688,6 +742,7 @@ export function TripWorkspace({
                   </div>
                 </div>
                 <div className="place-row-controls">
+                  <button className="edit-place" onClick={(event) => { event.stopPropagation(); setPlaceEditor(place); }} aria-label={`Edit ${place.name}`} type="button"><Pencil size={15} /></button>
                   <button className="save-button" onClick={(event) => { event.stopPropagation(); toggleSaved(place.id); }} aria-label={place.saved ? `Unsave ${place.name}` : `Save ${place.name}`} type="button"><Bookmark size={18} fill={place.saved ? "currentColor" : "none"} /></button>
                   <button className="delete-place" onClick={(event) => { event.stopPropagation(); removePlace(place.id); }} aria-label={`Remove ${place.name}`} type="button"><Trash2 size={15} /></button>
                 </div>
@@ -709,6 +764,7 @@ export function TripWorkspace({
               onEditFlight={(flight) => setFlightEditor(flight)}
               onAddHotel={() => setHotelEditor("new")}
               onEditHotel={(hotel) => setHotelEditor(hotel)}
+              onEditPlace={(place) => setPlaceEditor(place)}
               onRemoveNote={removeNote}
               onSelectPlace={selectPlace}
               onReorderDay={reorderDay}
@@ -736,7 +792,7 @@ export function TripWorkspace({
         <div className="map-topbar">
           <button className={`route-button${routeMode ? " active" : ""}`} disabled={!routeAvailable} onClick={() => setRouteMode((current) => current ?? "walking")} type="button"><Route size={16} /> {routeMode ? "Route active" : "Plan a route"}</button>
         </div>
-        {selected ? <button className="mobile-place-peek" onClick={() => setMobileView("list")} type="button"><span>{String(places.findIndex((place) => place.id === selected.id) + 1).padStart(2, "0")}</span><strong>{selected.name}</strong><small>{selected.neighborhood} · View details</small></button> : null}
+        {selected ? <button className={`mobile-place-peek${selected.category === "Transit" ? " transit" : ""}`} onClick={() => setMobileView("list")} type="button"><span>{selectedMapLabel}</span><strong>{selected.name}</strong><small>{selected.neighborhood} · View details</small></button> : null}
         {routeMode && routeAvailable ? (
           <div className="route-dock">
             <header><div><p className="eyebrow">Route preview</p><strong>{routeStops.length} stops · {kilometers ?? "…"} km</strong></div><button className="icon-button" onClick={() => setRouteMode(null)} aria-label="Close route preview" type="button"><X size={18} /></button></header>
@@ -767,6 +823,7 @@ export function TripWorkspace({
           onClose={() => { setAddOpen(false); setNewestCityId(null); }}
         />
       ) : null}
+      {placeEditor ? <EditPlaceDialog cities={cities} dates={itineraryDates} onClose={() => setPlaceEditor(null)} onSave={savePlaceEdit} place={placeEditor} /> : null}
       {cityOpen ? <AddCityDialog details={details} onAdd={(city) => { const added = addCity(city); if (newCityForPlace) setNewestCityId(added.id); setNewCityForPlace(false); }} onClose={() => setCityOpen(false)} /> : null}
       {flightEditor ? (
         <FlightPlanDialog
@@ -854,6 +911,7 @@ function DayPlan({
   onEditFlight,
   onAddHotel,
   onEditHotel,
+  onEditPlace,
   onFocusDate,
   onReorderDay,
   onRemoveNote,
@@ -877,6 +935,7 @@ function DayPlan({
   onEditFlight: (flight: Flight) => void;
   onAddHotel: () => void;
   onEditHotel: (hotel: HotelStay) => void;
+  onEditPlace: (place: Place) => void;
   onFocusDate: (plannedDate: string | null) => void;
   onRemoveNote: (noteId: string) => void;
   onSelectPlace: (placeId: string) => void;
@@ -1015,6 +1074,7 @@ function DayPlan({
                   onDrop={() => { if (draggingId) reorderPlace(draggingId, placeIndex); setDraggingId(null); setDropTargetId(null); }}
                   onMoveDown={() => movePlace(place.id, 1)}
                   onMoveUp={() => movePlace(place.id, -1)}
+                  onEdit={() => onEditPlace(place)}
                   onSelect={onSelectPlace}
                   onToggleSaved={onToggleSaved}
                   onUpdatePlanning={onUpdatePlanning}
@@ -1052,6 +1112,7 @@ function DayPlan({
                   onDrop={() => undefined}
                   onMoveDown={() => undefined}
                   onMoveUp={() => undefined}
+                  onEdit={() => onEditPlace(place)}
                   onSelect={onSelectPlace}
                   onToggleSaved={onToggleSaved}
                   onUpdatePlanning={onUpdatePlanning}
@@ -1079,6 +1140,7 @@ function DayPlaceRow({
   onDragOver,
   onDragStart,
   onDrop,
+  onEdit,
   onMoveDown,
   onMoveUp,
   onSelect,
@@ -1098,6 +1160,7 @@ function DayPlaceRow({
   onDragOver: () => void;
   onDragStart: () => void;
   onDrop: () => void;
+  onEdit: () => void;
   onMoveDown: () => void;
   onMoveUp: () => void;
   onSelect: (placeId: string) => void;
@@ -1157,6 +1220,7 @@ function DayPlaceRow({
           <button aria-label={`Move ${place.name} earlier`} disabled={number === "01"} onClick={(event) => { event.stopPropagation(); onMoveUp(); }} type="button"><ChevronUp size={14} /></button>
           <button aria-label={`Move ${place.name} later`} disabled={!canMoveDown} onClick={(event) => { event.stopPropagation(); onMoveDown(); }} type="button"><ChevronDown size={14} /></button>
         </div> : null}
+        <button className="edit-place" onClick={(event) => { event.stopPropagation(); onEdit(); }} aria-label={`Edit ${place.name}`} type="button"><Pencil size={15} /></button>
         <button className="save-button" onClick={(event) => { event.stopPropagation(); onToggleSaved(place.id); }} aria-label={place.saved ? `Unsave ${place.name}` : `Save ${place.name}`} type="button"><Bookmark size={18} fill={place.saved ? "currentColor" : "none"} /></button>
       </div>
     </article>

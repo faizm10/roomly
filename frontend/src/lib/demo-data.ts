@@ -78,6 +78,21 @@ export const demoPlaces: Place[] = [
     daySortOrder: 0,
     addedBy: "AS",
   },
+  {
+    id: "p-6",
+    fsqPlaceId: "demo-cais-do-sodre",
+    cityId: "demo-lisbon-city",
+    name: "Cais do Sodre Station",
+    address: "Praca do Duque da Terceira",
+    neighborhood: "Cais do Sodre",
+    category: "Transit",
+    note: "Metro, train, and ferry connection for the Almada dinner.",
+    coordinates: [-9.1453, 38.7061],
+    saved: true,
+    plannedDate: "2026-09-21",
+    daySortOrder: 1,
+    addedBy: "FM",
+  },
 ];
 
 export const demoTrips: Trip[] = [

@@ -4,6 +4,7 @@ export const PLACE_CATEGORIES = [
   "See",
   "Shop",
   "Stay",
+  "Transit",
   "Other",
 ] as const;
 

@@ -52,6 +52,11 @@ describe("google place categories", () => {
   it("maps tourist attractions to see", () => {
     expect(categoryFromGoogleTypes(["tourist_attraction", "point_of_interest"], "tourist_attraction")).toBe("See");
   });
+
+  it("maps transit stops to transit", () => {
+    expect(categoryFromGoogleTypes(["train_station", "transit_station", "point_of_interest"], "train_station")).toBe("Transit");
+    expect(categoryFromGoogleTypes(["bus_stop", "point_of_interest"], "bus_stop")).toBe("Transit");
+  });
 });
 
 describe("google viewports", () => {

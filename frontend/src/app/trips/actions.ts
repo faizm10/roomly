@@ -35,6 +35,7 @@ import {
   updateHotelStaySchema,
   updateAgendaBriefSchema,
   updateAgendaItemSchema,
+  updatePlaceDetailsSchema,
   updatePlacePlanningSchema,
   updatePlaceSchema,
   updateTripCitySchema,
@@ -283,6 +284,32 @@ export async function updatePlace(input: unknown) {
   const [updated] = await db
     .update(tripPlaces)
     .set({ saved: data.saved })
+    .where(and(eq(tripPlaces.id, data.placeId), eq(tripPlaces.tripId, data.tripId)))
+    .returning({ id: tripPlaces.id });
+  if (!updated) throw new Error("This place could not be updated.");
+  revalidateTrip(data.tripId);
+  return { demo: false };
+}
+
+export async function updatePlaceDetails(input: unknown) {
+  const viewer = await requireViewer();
+  const data = updatePlaceDetailsSchema.parse(input);
+  const db = getDatabase();
+  if (!db) return { demo: true };
+  await requireEditor(data.tripId, viewer.id);
+  const [updated] = await db
+    .update(tripPlaces)
+    .set({
+      cityId: optionalValue(data.cityId),
+      name: data.name,
+      address: data.address,
+      neighborhood: data.neighborhood,
+      category: data.category,
+      note: data.note,
+      sourceUrl: data.sourceUrl || null,
+      plannedDate: optionalValue(data.plannedDate),
+      daySortOrder: data.plannedDate ? data.daySortOrder ?? 0 : 0,
+    })
     .where(and(eq(tripPlaces.id, data.placeId), eq(tripPlaces.tripId, data.tripId)))
     .returning({ id: tripPlaces.id });
   if (!updated) throw new Error("This place could not be updated.");
