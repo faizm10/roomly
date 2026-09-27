@@ -69,6 +69,7 @@ import { TripLogisticsDialog, type TripDetails } from "@/components/trip-logisti
 import { TripMap } from "@/components/trip-map";
 import { countryFromDestination } from "@/lib/dates";
 import { buildAppleMapsUrl, buildGoogleMapsPlaceUrl, buildGoogleMapsUrl } from "@/lib/navigation";
+import { resolvePersistedPlaceIds } from "@/lib/place-persistence";
 import { PLACE_CATEGORIES, categoryClass, isPersistedTripId, type CityStop, type DayNote, type Flight, type HotelStay, type Place, type PlaceCategory, type RouteStop, type TravelMode, type TransitPlan, type Trip, type TripViewer } from "@/lib/types";
 
 type RouteStats = { durationSeconds: number; distanceMeters: number };
@@ -388,9 +389,14 @@ export function TripWorkspace({
     if (!persistable) return;
     enqueuePersist(async () => {
       try {
-        await persistReorderDayPlaces({ tripId: trip.id, plannedDate, placeIds });
+        await persistReorderDayPlaces({
+          tripId: trip.id,
+          plannedDate,
+          placeIds: resolvePersistedPlaceIds(placeIds, persistedIds.current),
+        });
       } catch (error) {
         setPlaces(previous);
+        if (error instanceof Error && error.message) setSaveNotice(error.message);
         throw error;
       }
     });
